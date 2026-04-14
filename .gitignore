@@ -1,0 +1,29 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Sensitive files
+.env
+*.env
+
+# Test CV dosyaları (gizlilik)
+*.pdf
+test_cv/
+sample_cv/
+
+# Streamlit credentials (keep config for styling/deploy button hiding)
+.streamlit/credentials.toml
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
