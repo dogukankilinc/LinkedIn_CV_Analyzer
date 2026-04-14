@@ -35,13 +35,21 @@
 
 ## 🚀 Kurulum ve İlk Çalıştırma
 
-### 1. Ön Koşullar
-Bu sistem dışarıya internet bağlantısı yapmadığı için modelin bilgisayarınıza yüklü olması gerekir.
-- [Ollama'yı indirin ve kurun](https://ollama.com/download)
-- CMD ekranını (Komut İstemcisi) açın ve şu komutla modeli indirin:
-  ```bash
-  ollama pull qwen2.5:7b
-  ```
+### 1. Ön Koşullar ve Veritabanı Kurulumu
+Bu sistem tam gizlilik odaklı olduğu için Python ve Yapay Zeka modeli kendi bilgisayarınızda çalışır. Yepyeni bir bilgisayara kurarken şu adımları izleyin:
+
+**A) Python Kurulumu (Kritik Adım):**
+1. [python.org/downloads](https://www.python.org/downloads/) adresinden Python 3.10 veya üzerini indirin.
+2. Kurulum dosyasını açtığınızda en alttaki **"Add Python to PATH"** kutucuğunu **MUTLAKA** işaretleyin. (İşaretlenmezse sistem çalışmaz).
+3. "Install Now" diyerek kurulumu bitirin.
+
+**B) Ollama ve Dil Modeli Kurulumu:**
+1. [ollama.com/download](https://ollama.com/download) adresinden Ollama uygulamasını indirip kurun. Sağ altta (saat yanında) çalıştığından emin olun.
+2. Başlat menüsünden `CMD` (Komut İstemcisi) açın ve şu komutu yazıp Enter'a basın:
+   ```cmd
+   ollama pull qwen2.5:7b
+   ```
+3. İndirme (%100) tamamlandığında CMD'yi kapatabilirsiniz. Artık ana beyin hazır.
 
 ### 2. Uygulamayı Başlatma (Windows)
 Sistemi tek tıkla kurup çalıştırmak için yazılmış otomatik bir script bulunur.
