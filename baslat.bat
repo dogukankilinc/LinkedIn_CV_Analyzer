@@ -9,8 +9,8 @@ IF %ERRORLEVEL% NEQ 0 (
     echo DIKKAT: Ollama calismiyor veya kurulamamis.
     echo Lutfen once Ollama uygulamasini actiginiza emin olun.
     echo Eger yuklu degilse: https://ollama.com/download
-    echo Eger Llama 3 modeli yoksa, CMD acip u su komutu calistirin:
-    echo   ollama pull llama3
+    echo Eger qwen2.5:7b modeli yoksa, CMD acip su komutu calistirin:
+    echo   ollama pull qwen2.5:7b
     echo ====================================================
     echo.
     pause
