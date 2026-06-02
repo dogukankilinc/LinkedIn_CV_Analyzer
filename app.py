@@ -3,7 +3,7 @@ import json
 import os
 from dotenv import load_dotenv
 from core.input_handler import get_combined_text
-from core.llm_client import analyze_cv_with_ollama, check_ollama_status
+from core.llm_client import analyze_cv_with_ollama, check_ollama_status, get_model_name
 from core.response_parser import parse_and_validate
 from core.pdf_rapor import pdf_rapor_olustur
 
@@ -49,6 +49,10 @@ st.markdown("""
         border-radius: 6px; padding: 10px 16px; margin-bottom: 8px;
         color: #cce5f6; font-size: 14px;
     }
+    .dil-kart {
+        border-radius: 12px; padding: 16px 20px; margin-bottom: 4px;
+        text-align: center; cursor: pointer;
+    }
     .beceri-badge {
         display: inline-block; background: #1a365d;
         color: #90cdf4; border: 1px solid #2b6cb0;
@@ -56,67 +60,43 @@ st.markdown("""
         font-size: 12px; margin: 3px 4px 3px 0;
     }
     .tavsiye-kart {
-        background: #0f2537;
-        border: 1px solid #1e4060;
-        border-radius: 12px;
-        padding: 18px 20px;
-        margin-bottom: 14px;
+        background: #0f2537; border: 1px solid #1e4060;
+        border-radius: 12px; padding: 18px 20px; margin-bottom: 14px;
     }
-    .tavsiye-kart h4 {
-        color: #63b3ed;
-        margin: 0 0 8px 0;
-        font-size: 15px;
-    }
+    .tavsiye-kart h4 { color: #63b3ed; margin: 0 0 8px 0; font-size: 15px; }
     .bulgu-kutusu {
-        background: #1a2d40;
-        border-left: 3px solid #e67e22;
-        border-radius: 4px;
-        padding: 8px 12px;
-        color: #fbd38d;
-        font-size: 13px;
-        margin-bottom: 10px;
+        background: #1a2d40; border-left: 3px solid #e67e22;
+        border-radius: 4px; padding: 8px 12px;
+        color: #fbd38d; font-size: 13px; margin-bottom: 10px;
     }
     .toolbox-badge {
-        display: inline-block;
-        background: #1c4f82;
-        color: #bee3f8;
-        border: 1px solid #2b6cb0;
-        border-radius: 6px;
-        padding: 4px 12px;
-        font-size: 12px;
-        margin: 3px 4px 3px 0;
-        font-weight: 600;
+        display: inline-block; background: #1c4f82; color: #bee3f8;
+        border: 1px solid #2b6cb0; border-radius: 6px;
+        padding: 4px 12px; font-size: 12px;
+        margin: 3px 4px 3px 0; font-weight: 600;
     }
     .arguman-kutusu {
-        background: #0d3b2e;
-        border-left: 3px solid #27ae60;
-        border-radius: 4px;
-        padding: 10px 14px;
-        color: #c6f6d5;
-        font-size: 13.5px;
-        margin-top: 10px;
-        line-height: 1.6;
+        background: #0d3b2e; border-left: 3px solid #27ae60;
+        border-radius: 4px; padding: 10px 14px;
+        color: #c6f6d5; font-size: 13.5px;
+        margin-top: 10px; line-height: 1.6;
     }
     .ana-urun-etiket {
-        display: inline-block;
-        background: #0076A8;
-        color: white;
-        border-radius: 20px;
-        padding: 3px 14px;
-        font-size: 12px;
-        font-weight: 700;
-        margin-bottom: 8px;
+        display: inline-block; background: #0076A8; color: white;
+        border-radius: 20px; padding: 3px 14px;
+        font-size: 12px; font-weight: 700; margin-bottom: 8px;
+    }
+    .model-bilgi {
+        background: #0d1f2d; border: 1px solid #1e4060;
+        border-radius: 8px; padding: 10px 16px;
+        font-size: 13px; color: #7fb3d3; margin-bottom: 12px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ─── Başlık ─────────────────────────────────────────────────────
-orin_ip = "127.0.0.1"
 st.markdown("# 🔬 FIGES MathWorks CV Analyzer")
-st.markdown(
-    f"**MathWorks Ürün Öneri Motoru** — Model: `qwen2.5:72b` | "
-    f"Ollama: `localhost:11434`"
-)
+st.markdown("**MathWorks Ürün Öneri Motoru** — Yerel LLM | Ollama `localhost:11434`")
 st.divider()
 
 # ─── Bağlantı Kontrolü ──────────────────────────────────────────
@@ -125,56 +105,86 @@ if not check_ollama_status():
     st.info(
         "💡 **Kontrol listesi:**\n"
         "- Ollama uygulaması başlatıldı mı? (`ollama serve`)\n"
-        "- `qwen2.5:72b` modeli yüklü mü? (`ollama pull qwen2.5:72b`)\n"
         "- Güvenlik duvarı 11434 portunu engelliyor mu?"
     )
     st.stop()
 
+# ─── DİL SEÇİMİ ─────────────────────────────────────────────────
+st.subheader("🌐 CV Dili Seçin")
+
+lang_col1, lang_col2 = st.columns(2)
+with lang_col1:
+    tr_btn = st.button(
+        "🇹🇷  Türkçe CV\n\n`qwen2.5:14b` — Türkçe'de en güçlü açık model",
+        use_container_width=True,
+        type="primary" if st.session_state.get("language", "tr") == "tr" else "secondary",
+        key="btn_tr"
+    )
+with lang_col2:
+    en_btn = st.button(
+        "🇬🇧  English CV\n\n`phi4` — Microsoft's champion for JSON & instructions",
+        use_container_width=True,
+        type="primary" if st.session_state.get("language", "tr") == "en" else "secondary",
+        key="btn_en"
+    )
+
+if tr_btn:
+    st.session_state["language"] = "tr"
+    st.rerun()
+if en_btn:
+    st.session_state["language"] = "en"
+    st.rerun()
+
+language  = st.session_state.get("language", "tr")
+model_adi = get_model_name(language)
+lang_icon = "🇹🇷 Türkçe" if language == "tr" else "🇬🇧 English"
+
+st.markdown(
+    f'<div class="model-bilgi">✅ Aktif mod: <b>{lang_icon}</b> &nbsp;|&nbsp; '
+    f'Model: <code>{model_adi}</code> &nbsp;|&nbsp; '
+    f'Çıktı dili: <b>{"Türkçe" if language == "tr" else "English"}</b></div>',
+    unsafe_allow_html=True
+)
+st.divider()
+
 # ─── Veri Girişi ────────────────────────────────────────────────
-st.subheader("📋 Veri Girişi")
+upload_label = "📂 CV dosyasını buraya sürükleyin (PDF)" if language == "tr" else "📂 Drop your CV here (PDF)"
+text_label   = "✏️ CV metnini buraya yapıştırın" if language == "tr" else "✏️ Paste your CV text here"
+text_ph      = "CV metnini veya LinkedIn profilini buraya yapıştırabilirsiniz..." if language == "tr" else "Paste CV text or LinkedIn profile content here..."
+
+st.subheader("📋 Veri Girişi" if language == "tr" else "📋 Input")
 input_mode = st.radio(
     "Yöntem:",
-    ["📄 Sadece PDF Yükle", "📝 Sadece Metin Yapıştır", "📄+📝 PDF ve Metni Birlikte Kullan"],
+    ["📄 PDF", "📝 Metin / Text", "📄+📝 İkisi / Both"],
     horizontal=True,
     label_visibility="collapsed"
 )
 
 uploaded_file = None
-manual_text = ""
+manual_text   = ""
 
 with st.container():
-    if input_mode in ["📄 Sadece PDF Yükle", "📄+📝 PDF ve Metni Birlikte Kullan"]:
-        uploaded_file = st.file_uploader(
-            "📂 CV dosyasını buraya sürükleyin (PDF)",
-            type=["pdf"],
-            help="LinkedIn profilinizden 'Dışa Aktar → PDF Kaydet' ile indirilen dosyayı yükleyin."
-        )
-    if input_mode in ["📝 Sadece Metin Yapıştır", "📄+📝 PDF ve Metni Birlikte Kullan"]:
-        manual_text = st.text_area(
-            "✏️ CV metnini buraya yapıştırın",
-            height=220,
-            placeholder="CV metnini, proje açıklamalarını veya LinkedIn profilini buraya yapıştırabilirsiniz..."
-        )
+    if input_mode in ["📄 PDF", "📄+📝 İkisi / Both"]:
+        uploaded_file = st.file_uploader(upload_label, type=["pdf"])
+    if input_mode in ["📝 Metin / Text", "📄+📝 İkisi / Both"]:
+        manual_text = st.text_area(text_label, height=220, placeholder=text_ph)
 
 # ─── Form Doğrulama ─────────────────────────────────────────────
 can_analyze = False
-if "PDF Yükle" in input_mode and uploaded_file is not None:
+if "PDF" in input_mode and uploaded_file is not None:
     can_analyze = True
-elif "Metin Yapıştır" in input_mode and manual_text.strip():
+elif "Metin" in input_mode and manual_text.strip():
     can_analyze = True
-elif "Birlikte Kullan" in input_mode and (uploaded_file is not None or manual_text.strip()):
+elif "İkisi" in input_mode and (uploaded_file is not None or manual_text.strip()):
     can_analyze = True
 
 if not can_analyze:
-    st.info("ℹ️ Analiz başlatmak için lütfen bir PDF yükleyin veya metin girin.")
+    st.info("ℹ️ Lütfen bir PDF yükleyin veya CV metnini yapıştırın." if language == "tr"
+            else "ℹ️ Please upload a PDF or paste your CV text.")
 
 st.divider()
-analiz_btn = st.button(
-    "🚀 ANALİZİ BAŞLAT",
-    type="primary",
-    use_container_width=True,
-    disabled=not can_analyze
-)
+btn_label = "🚀 ANALİZİ BAŞLAT" if language == "tr" else "🚀 START ANALYSIS"
+analiz_btn = st.button(btn_label, type="primary", use_container_width=True, disabled=not can_analyze)
 
 # ─── Analiz ─────────────────────────────────────────────────────
 if analiz_btn:
@@ -190,52 +200,55 @@ if analiz_btn:
         )
 
     try:
-        asama(10, "📖 Dosyalar okunuyor ve birleştiriliyor...")
+        asama(10, "📖 Dosyalar okunuyor..." if language == "tr" else "📖 Reading files...")
         cv_text = get_combined_text(uploaded_file, manual_text)
 
-        asama(30, "📝 Analiz için metin hazırlanıyor...")
+        asama(30, "📝 Metin hazırlanıyor..." if language == "tr" else "📝 Preparing text...")
 
-        asama(50, "🤖 Jetson AGX Orin'e gönderiliyor — qwen2.5:72b analiz ediyor, lütfen bekleyin...")
-        raw_response = analyze_cv_with_ollama(cv_text)
+        asama(50, f"🤖 {model_adi} modeline gönderiliyor, lütfen bekleyin..."
+              if language == "tr" else f"🤖 Sending to {model_adi}, please wait...")
+        raw_response = analyze_cv_with_ollama(cv_text, language)
 
-        asama(80, "🔍 Yanıt doğrulanıyor ve MathWorks önerileri düzenleniyor...")
+        asama(80, "🔍 Yanıt doğrulanıyor..." if language == "tr" else "🔍 Validating response...")
         result, errors = parse_and_validate(raw_response)
 
-        asama(100, "✅ Analiz tamamlandı!")
+        asama(100, "✅ Tamamlandı!" if language == "tr" else "✅ Done!")
         ilerleme_bar.empty()
         durum_metni.empty()
 
         # ─── Hata Kontrolü ──────────────────────────────────────
         if errors and not result:
-            st.error(f"❌ Analiz tamamlanamadı: {', '.join(errors)}")
+            st.error(f"❌ {', '.join(errors)}")
             st.stop()
         if errors:
-            st.warning(f"⚠️ Analiz tamamlandı, bazı uyarılar: {', '.join(errors)}")
+            st.warning(f"⚠️ {', '.join(errors)}")
         else:
-            st.success("✅ Analiz başarıyla tamamlandı!")
+            st.success("✅ Analiz başarıyla tamamlandı!" if language == "tr" else "✅ Analysis completed successfully!")
 
         # ─── MÜŞTERİ PROFİLİ ────────────────────────────────────
         kisiler  = result.get("kisisel_bilgiler", {})
-        ad_soyad = kisiler.get("ad_soyad") or "Bilinmiyor"
+        ad_soyad = kisiler.get("ad_soyad") or ("Bilinmiyor" if language == "tr" else "Unknown")
         sektor   = kisiler.get("sektor_veya_uzmanlik_alani") or "—"
 
         st.markdown(f"## 👤 {ad_soyad}")
-        st.markdown(f"**Sektör / Uzmanlık Alanı:** `{sektor}`")
+        label = "Sektör / Uzmanlık Alanı" if language == "tr" else "Sector / Expertise"
+        st.markdown(f"**{label}:** `{sektor}`")
         st.divider()
 
-        # ─── MÜHENDİSLİK YETKİNLİKLERİ ─────────────────────────
+        # ─── YETKİNLİKLER ───────────────────────────────────────
         yetkinlikler = result.get("mevcut_muhendislik_yetkinlikleri", [])
         if yetkinlikler:
-            st.markdown("### 🛠️ Müşteri Yetkinlikleri")
-            badges = " ".join(
-                [f'<span class="beceri-badge">{y}</span>' for y in yetkinlikler]
-            )
+            title = "🛠️ Müşteri Yetkinlikleri" if language == "tr" else "🛠️ Customer Competencies"
+            st.markdown(f"### {title}")
+            badges = " ".join([f'<span class="beceri-badge">{y}</span>' for y in yetkinlikler])
             st.markdown(badges, unsafe_allow_html=True)
             st.divider()
 
         # ─── MATHWORKS ÖNERİLERİ ────────────────────────────────
         tavsiyeleri = result.get("mathworks_urun_tavsiyeleri", [])
-        st.markdown(f"### 📦 Önerilen MathWorks Çözümleri  `({len(tavsiyeleri)} öneri)`")
+        title = f"📦 Önerilen MathWorks Çözümleri  `({len(tavsiyeleri)} öneri)`" if language == "tr" \
+                else f"📦 Recommended MathWorks Solutions  `({len(tavsiyeleri)} recommendations)`"
+        st.markdown(f"### {title}")
 
         for i, tb in enumerate(tavsiyeleri, 1):
             ana_urun   = tb.get("onerilen_ana_urun", "MATLAB")
@@ -243,44 +256,45 @@ if analiz_btn:
             bulgu      = tb.get("tespit_edilen_ihtiyac", "")
             arguman    = tb.get("satis_ve_kullanim_argumani", "")
 
-            toolbox_badges = " ".join(
-                [f'<span class="toolbox-badge">📦 {t}</span>' for t in toolboxlar]
-            )
+            toolbox_badges = " ".join([f'<span class="toolbox-badge">📦 {t}</span>' for t in toolboxlar])
+            bulgu_label  = "Tespit Edilen İhtiyaç" if language == "tr" else "Identified Need"
+            arguman_label = "Satış Argümanı" if language == "tr" else "Sales Argument"
 
             st.markdown(f"""
 <div class="tavsiye-kart">
     <h4>#{i} — <span class="ana-urun-etiket">{ana_urun}</span></h4>
-    <div class="bulgu-kutusu">🔍 <b>Tespit Edilen İhtiyaç:</b> {bulgu}</div>
+    <div class="bulgu-kutusu">🔍 <b>{bulgu_label}:</b> {bulgu}</div>
     <div style="margin-bottom:8px">{toolbox_badges}</div>
-    <div class="arguman-kutusu">💬 <b>Satış Argümanı:</b> {arguman}</div>
+    <div class="arguman-kutusu">💬 <b>{arguman_label}:</b> {arguman}</div>
 </div>
 """, unsafe_allow_html=True)
 
         # ─── RAPOR DIŞA AKTARMA ──────────────────────────────────
         st.divider()
-        st.markdown("### 📤 Raporu Dışa Aktar")
+        export_title = "### 📤 Raporu Dışa Aktar" if language == "tr" else "### 📤 Export Report"
+        st.markdown(export_title)
         aday_dosya_adi = ad_soyad.replace(" ", "_")
 
         exp_col1, exp_col2 = st.columns(2)
         with exp_col1:
-            with st.spinner("PDF hazırlanıyor..."):
+            with st.spinner("PDF hazırlanıyor..." if language == "tr" else "Preparing PDF..."):
                 try:
                     pdf_bytes = pdf_rapor_olustur(result)
                     st.download_button(
-                        label="📄 PDF Olarak İndir",
+                        label="📄 PDF İndir" if language == "tr" else "📄 Download PDF",
                         data=pdf_bytes,
-                        file_name=f"mathworks_analiz_{aday_dosya_adi}.pdf",
+                        file_name=f"mathworks_{aday_dosya_adi}.pdf",
                         mime="application/pdf",
                         use_container_width=True
                     )
                 except Exception as pdf_err:
-                    st.error(f"PDF oluşturulamadı: {pdf_err}")
+                    st.error(f"PDF hatası: {pdf_err}")
 
         with exp_col2:
             st.download_button(
-                label="🗂️ JSON Olarak İndir",
+                label="🗂️ JSON İndir" if language == "tr" else "🗂️ Download JSON",
                 data=json.dumps(result, ensure_ascii=False, indent=2),
-                file_name=f"mathworks_analiz_{aday_dosya_adi}.json",
+                file_name=f"mathworks_{aday_dosya_adi}.json",
                 mime="application/json",
                 use_container_width=True
             )
@@ -288,17 +302,15 @@ if analiz_btn:
     except Exception as e:
         ilerleme_bar.empty()
         durum_metni.empty()
-        st.error(f"❌ Beklenmeyen bir hata oluştu: {str(e)}")
-        st.info(
-            "💡 Yerel Ollama servisinin çalıştığını ve "
-            "`qwen2.5:72b` modelinin yüklü olduğunu kontrol edin."
-        )
+        st.error(f"❌ {str(e)}")
+        st.info("💡 Ollama servisinin çalıştığını ve modelin yüklü olduğunu kontrol edin." if language == "tr"
+                else "💡 Check that Ollama is running and the model is installed.")
 
 # ─── Footer ──────────────────────────────────────────────────────
 st.markdown("""
 <div class="custom-footer">
     🔬 <strong>FIGES MathWorks CV Analyzer</strong> &nbsp;|&nbsp;
-    Ollama · qwen2.5:72b · localhost &nbsp;|&nbsp;
+    🇹🇷 qwen2.5:14b &nbsp;·&nbsp; 🇬🇧 phi4 &nbsp;|&nbsp;
     Geliştirici: <a href="https://www.linkedin.com/in/dgkilinc/" target="_blank">Doğukan Mehmet KILINÇ</a>
     &nbsp;|&nbsp; Tüm veriler yerel cihazda işlenir
 </div>
