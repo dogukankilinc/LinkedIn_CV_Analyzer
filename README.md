@@ -154,5 +154,5 @@ BASE_URL   = "http://127.0.0.1:11434/v1"  # uzak sunucu için IP gir
 
 ## 👨‍💻 Geliştirici
 
-**Doğukan Mehmet KILINÇ**
+**Doğukan M. KILINÇ**
 *[linkedin.com/in/dgkilinc](https://www.linkedin.com/in/dgkilinc/)*
