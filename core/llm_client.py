@@ -1,38 +1,49 @@
-import ollama
-import json
+import os
+from openai import OpenAI
+from dotenv import load_dotenv
 from core.prompt_builder import build_system_prompt, build_user_prompt
 
-MODEL_NAME = "qwen2.5:7b"
+load_dotenv()
 
-def check_ollama_status():
-    """Ollama'nin calisip calismadigini ve modelin yuklu olup olmadigini dogrular."""
+MODEL_NAME = "qwen2.5:72b"
+BASE_URL   = "http://127.0.0.1:11434/v1"
+
+
+def _get_client() -> OpenAI:
+    """Yerel Ollama sunucusuna bağlanan OpenAI uyumlu istemciyi döndürür."""
+    return OpenAI(base_url=BASE_URL, api_key="ollama")
+
+
+def check_ollama_status() -> bool:
+    """Yerel Ollama servisine erişilebilir mi kontrol eder."""
     try:
-        models = ollama.list()
-        # Modelleri kontrol et if needed
+        _get_client().models.list()
         return True
-    except Exception as e:
+    except Exception:
         return False
+
 
 def analyze_cv_with_ollama(cv_text: str) -> str:
     """
-    CV metnini yerel Ollama servisine gönderir ve ham JSON yanıt döndürür.
+    CV metnini yerel Ollama'ya (OpenAI uyumlu endpoint) gönderir,
+    ham JSON string döndürür.
     """
-    system_prompt = build_system_prompt()
-    user_message = build_user_prompt(cv_text)
-    
+    client = _get_client()
+
     try:
-        response = ollama.chat(
+        response = client.chat.completions.create(
             model=MODEL_NAME,
+            temperature=0.1,
             messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_message}
+                {"role": "system", "content": build_system_prompt()},
+                {"role": "user",   "content": build_user_prompt(cv_text)},
             ],
-            format='json',
-            options={
-                'temperature': 0.1,
-                'num_predict': 2048,
-            }
+            extra_body={"format": "json"},  # Ollama katı JSON modu
         )
-        return response['message']['content']
+        return response.choices[0].message.content
     except Exception as e:
-        raise Exception(f"Ollama bağlantı hatası: {str(e)}\nLütfen CMD'den 'ollama run {MODEL_NAME}' komutunu çalıştırarak modelin yüklü olduğundan emin olun.")
+        raise Exception(
+            f"Ollama bağlantı hatası: {str(e)}\n"
+            f"Lütfen yerel Ollama servisinin (127.0.0.1:11434) çalıştığından "
+            f"ve '{MODEL_NAME}' modelinin yüklü olduğundan emin olun."
+        )

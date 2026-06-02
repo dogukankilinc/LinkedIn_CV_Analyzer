@@ -11,6 +11,7 @@ env/
 # Sensitive files
 .env
 *.env
+.env.local
 
 # Test CV dosyaları (gizlilik)
 *.pdf

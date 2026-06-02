@@ -1,8 +1,10 @@
 import json
 
+
 def parse_and_validate(raw_response: str) -> tuple[dict, list[str]]:
     """
-    LLM yanıtını parse eder, doğrular ve normalize eder.
+    qwen2.5:72b modelinden gelen yanıtı parse eder ve doğrular.
+    extra_body={"format":"json"} ile saf JSON beklenir, yine de temizlik yapılır.
     """
     errors = []
 
@@ -10,14 +12,20 @@ def parse_and_validate(raw_response: str) -> tuple[dict, list[str]]:
     try:
         cleaned = raw_response.strip()
 
-        # format='json' olmadan model bazen JSON öncesi/sonrası metin ekler
-        # { ... } bloğunu bul ve çıkar
+        # Olası markdown sarmalayıcıları temizle
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+
+        # JSON bloğunu bul (model bazen önüne metin ekleyebilir)
         if not cleaned.startswith("{"):
             start = cleaned.find("{")
             if start != -1:
-                # Eşleşen kapanış parantezini bul
-                depth = 0
-                end = start
+                depth, end = 0, start
                 for i, ch in enumerate(cleaned[start:], start):
                     if ch == "{":
                         depth += 1
@@ -28,76 +36,45 @@ def parse_and_validate(raw_response: str) -> tuple[dict, list[str]]:
                             break
                 cleaned = cleaned[start:end + 1]
 
-        # ```json ``` bloğu sarmalanmış olabilir
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-        elif cleaned.startswith("```"):
-            cleaned = cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-
         data = json.loads(cleaned)
+
     except json.JSONDecodeError as e:
-        return {}, [f"JSON Parse Hatası: {str(e)}", "Model geçerli bir JSON döndürmedi."]
+        return {}, [f"JSON Parse Hatası: {str(e)} — Model geçerli bir JSON döndürmedi."]
 
-    # ─── 2. Skor Normalizasyonu ──────────────────────────────────
+    # ─── 2. Alan Garantileri ────────────────────────────────────
     try:
-        scores = data.get("scores", {})
+        # kisisel_bilgiler
+        if not isinstance(data.get("kisisel_bilgiler"), dict):
+            data["kisisel_bilgiler"] = {
+                "ad_soyad": None,
+                "sektor_veya_uzmanlik_alani": None
+            }
 
-        def safe_pct(cat_key):
-            val = scores.get(cat_key, {})
-            if isinstance(val, dict):
-                return int(val.get("percentage", 0))
-            return 0
+        # mevcut_muhendislik_yetkinlikleri — liste olmalı
+        if not isinstance(data.get("mevcut_muhendislik_yetkinlikleri"), list):
+            data["mevcut_muhendislik_yetkinlikleri"] = []
 
-        ai_score = safe_pct("ai")
-        sm_score = safe_pct("system_modeling")
-        es_score = safe_pct("embedded_systems")
-        total = ai_score + sm_score + es_score
+        # mathworks_urun_tavsiyeleri — liste olmalı, her eleman dict
+        tavsiyeleri = data.get("mathworks_urun_tavsiyeleri", [])
+        if not isinstance(tavsiyeleri, list):
+            tavsiyeleri = []
 
-        if total > 0 and total != 100:
-            data["scores"]["ai"]["percentage"]               = round(ai_score / total * 100)
-            data["scores"]["system_modeling"]["percentage"]  = round(sm_score / total * 100)
-            data["scores"]["embedded_systems"]["percentage"] = round(es_score / total * 100)
-
-    except Exception as e:
-        errors.append(f"Skor normalizasyon hatası: {str(e)}")
-
-    # ─── 3. Öneri Yapısı Düzeltme ───────────────────────────────
-    try:
-        recs = data.get("recommendations", {})
-
-        # Model bazen recommendations'ı list döndürebiliyor — sıfırla
-        if not isinstance(recs, dict):
-            recs = {}
-
-        for cat in ["ai", "system_modeling", "embedded_systems"]:
-            cat_data = recs.get(cat, {})
-
-            # Kategori yoksa boş oluştur
-            if cat_data is None or not isinstance(cat_data, dict):
-                recs[cat] = {"toolboxes": [], "sales_pitch": ""}
+        temiz_tavsiyeleri = []
+        for i, tb in enumerate(tavsiyeleri):
+            if not isinstance(tb, dict):
                 continue
+            # zorunlu alanlar garantisi
+            temiz = {
+                "tespit_edilen_ihtiyac":   tb.get("tespit_edilen_ihtiyac") or "",
+                "onerilen_ana_urun":       tb.get("onerilen_ana_urun") or "MATLAB",
+                "onerilen_toolboxlar":     tb.get("onerilen_toolboxlar") if isinstance(tb.get("onerilen_toolboxlar"), list) else [],
+                "satis_ve_kullanim_argumani": tb.get("satis_ve_kullanim_argumani") or "",
+            }
+            temiz_tavsiyeleri.append(temiz)
 
-            # toolboxes alanını al — yoksa veya hatalıysa boş liste ver
-            raw_tbs = cat_data.get("toolboxes", [])
-            if not isinstance(raw_tbs, list):
-                raw_tbs = []
-
-            # Her elemanın dict olduğundan emin ol
-            clean_tbs = [tb for tb in raw_tbs if isinstance(tb, dict)]
-            cat_data["toolboxes"] = clean_tbs
-
-            # sales_pitch kontrolü
-            if not isinstance(cat_data.get("sales_pitch"), str):
-                cat_data["sales_pitch"] = ""
-
-            recs[cat] = cat_data
-
-        data["recommendations"] = recs
+        data["mathworks_urun_tavsiyeleri"] = temiz_tavsiyeleri
 
     except Exception as e:
-        errors.append(f"Öneri yapısı düzeltme hatası: {str(e)}")
+        errors.append(f"Alan doğrulama hatası: {str(e)}")
 
     return data, errors
