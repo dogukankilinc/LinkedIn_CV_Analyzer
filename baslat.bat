@@ -32,5 +32,20 @@ IF NOT EXIST ".venv" (
 )
 
 echo.
+echo Modeller RAM'e alinıyor (arka planda)...
+echo Bu islem USB SSD'den ilk okuma bekleme suresini sifira indirir.
+
+:: Türkçe model (öncelikli) — arka planda yükle
+start /b powershell -WindowStyle Hidden -Command ^
+  "Invoke-RestMethod -Uri 'http://localhost:11434/api/generate' -Method POST -ContentType 'application/json' -Body '{\"model\":\"qwen2.5:14b\",\"prompt\":\"\",\"keep_alive\":\"4h\",\"stream\":false}'" ^
+  2>nul
+
+:: İngilizce model — arka planda yükle
+start /b powershell -WindowStyle Hidden -Command ^
+  "Invoke-RestMethod -Uri 'http://localhost:11434/api/generate' -Method POST -ContentType 'application/json' -Body '{\"model\":\"phi4\",\"prompt\":\"\",\"keep_alive\":\"4h\",\"stream\":false}'" ^
+  2>nul
+
+echo [OK] Warm-up istekleri gonderildi. Modeller arka planda RAM'e yuklenirken arayuz aciliyor...
+echo.
 echo Arayuz aciliyor... Lutfen tarayicinin acilmasini bekleyin (http://localhost:8501)
 streamlit run app.py

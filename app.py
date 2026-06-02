@@ -1,9 +1,13 @@
 import streamlit as st
 import json
 import os
+import threading
 from dotenv import load_dotenv
 from core.input_handler import get_combined_text
-from core.llm_client import analyze_cv_with_ollama, check_ollama_status, get_model_name
+from core.llm_client import (
+    analyze_cv_with_ollama, check_ollama_status,
+    get_model_name, warmup_model, MODELS
+)
 from core.response_parser import parse_and_validate
 from core.pdf_rapor import pdf_rapor_olustur
 
@@ -109,6 +113,33 @@ if not check_ollama_status():
     )
     st.stop()
 
+# ─── ARKA PLAN MODEL WARM-UP ────────────────────────────────────
+@st.cache_resource
+def _baslat_warmup() -> dict:
+    """
+    Uygulama ilk açıldığında arka planda tüm modelleri RAM'e alır.
+    st.cache_resource sayesinde sadece bir kez çalışır (Streamlit sunucu ömrü boyunca).
+    Returns: Her model için warm-up durumu {"tr": thread, "en": thread}
+    """
+    threads = {}
+    for lang, model in MODELS.items():
+        t = threading.Thread(
+            target=warmup_model,
+            args=(lang,),
+            name=f"warmup-{model}",
+            daemon=True
+        )
+        t.start()
+        threads[lang] = t
+    return threads
+
+# Warm-up'ı başlat (bloklamaz — arka planda çalışır)
+_warmup_threads = _baslat_warmup()
+
+# Türkçe model (öncelikli) henüz yükleniyor mu?
+_tr_yukleniyor = _warmup_threads["tr"].is_alive()
+_en_yukleniyor = _warmup_threads["en"].is_alive()
+
 # ─── DİL SEÇİMİ ─────────────────────────────────────────────────
 st.subheader("🌐 CV Dili Seçin")
 
@@ -139,10 +170,18 @@ language  = st.session_state.get("language", "tr")
 model_adi = get_model_name(language)
 lang_icon = "🇹🇷 Türkçe" if language == "tr" else "🇬🇧 English"
 
+# Warm-up durum ikonu
+_yukleniyor = _tr_yukleniyor if language == "tr" else _en_yukleniyor
+_durum_ikon  = "⏳ Belleğe alınıyor..." if _yukleniyor else "✅ Belleğe alındı, hazır!"
+_durum_renk  = "#e67e22" if _yukleniyor else "#27ae60"
+
 st.markdown(
-    f'<div class="model-bilgi">✅ Aktif mod: <b>{lang_icon}</b> &nbsp;|&nbsp; '
-    f'Model: <code>{model_adi}</code> &nbsp;|&nbsp; '
-    f'Çıktı dili: <b>{"Türkçe" if language == "tr" else "English"}</b></div>',
+    f'<div class="model-bilgi">'
+    f'<span style="color:{_durum_renk};font-weight:bold">{_durum_ikon}</span>'
+    f' &nbsp;|&nbsp; Aktif mod: <b>{lang_icon}</b>'
+    f' &nbsp;|&nbsp; Model: <code>{model_adi}</code>'
+    f' &nbsp;|&nbsp; Çıktı: <b>{"Türkçe" if language == "tr" else "English"}</b>'
+    f'</div>',
     unsafe_allow_html=True
 )
 st.divider()

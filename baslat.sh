@@ -62,8 +62,31 @@ pip install --quiet -r requirements.txt
 echo "[OK] Tum kutuphaneler hazir."
 echo ""
 
-# ─── 5. Uygulamayı Başlat ─────────────────────────────────────
+# ─── 5. Model Warm-Up (RAM'e Önceden Yükleme) ────────────────
+echo "Modeller RAM'e alinıyor (arka planda)..."
+echo "Bu islem USB SSD'den ilk okuma bekleme süresini sifira indirir."
+
+# Türkçe model (öncelikli) — arka planda yükle
+curl -s -X POST http://localhost:11434/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen2.5:14b","prompt":"","keep_alive":"4h","stream":false}' \
+  > /dev/null &
+WARMUP_TR_PID=$!
+
+# İngilizce model — arka planda yükle
+curl -s -X POST http://localhost:11434/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"model":"phi4","prompt":"","keep_alive":"4h","stream":false}' \
+  > /dev/null &
+WARMUP_EN_PID=$!
+
+echo "[OK] Warm-up istekleri gonderildi (PID: TR=$WARMUP_TR_PID, EN=$WARMUP_EN_PID)"
+echo "     Modeller arka planda RAM'e yuklenirken arayuz aciliyor..."
+echo ""
+
+# ─── 6. Uygulamayı Başlat ─────────────────────────────────────
 echo "Arayuz baslatiliyor: http://localhost:8501"
 echo "(Durdurmak icin CTRL+C)"
 echo ""
 streamlit run app.py --server.address=0.0.0.0 --server.port=8501
+
