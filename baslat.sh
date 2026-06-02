@@ -23,14 +23,21 @@ if ! ollama list &> /dev/null; then
     sleep 3
 fi
 
-# qwen2.5:72b modeli yuklu mu kontrol et
-if ! ollama list | grep -q "qwen2.5:72b"; then
-    echo "[UYARI] qwen2.5:72b modeli bulunamadi."
-    echo "Model indiriliyor... (Bu islem uzun surebilir)"
-    ollama pull qwen2.5:72b
+# qwen2.5:14b modeli yuklu mu kontrol et
+if ! ollama list | grep -q "qwen2.5:14b"; then
+    echo "[UYARI] qwen2.5:14b modeli bulunamadi."
+    echo "Model indiriliyor... (~9 GB, lutfen bekleyin)"
+    ollama pull qwen2.5:14b
 fi
 
-echo "[OK] Ollama servisi ve model hazir."
+# phi4 modeli yuklu mu kontrol et
+if ! ollama list | grep -q "phi4"; then
+    echo "[UYARI] phi4 modeli bulunamadi."
+    echo "Model indiriliyor... (~9 GB, lutfen bekleyin)"
+    ollama pull phi4
+fi
+
+echo "[OK] Ollama servisi ve modeller hazir."
 echo ""
 
 # ─── 2. Python Kontrol ───────────────────────────────────────

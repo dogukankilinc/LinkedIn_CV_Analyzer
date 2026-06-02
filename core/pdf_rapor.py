@@ -91,7 +91,7 @@ def pdf_rapor_olustur(analiz_sonucu: dict) -> bytes:
 
     baslik_tablo = Table([[
         Paragraph("🔬 FIGES MathWorks Ürün Öneri Raporu", baslik_stil),
-        Paragraph(f"Oluşturulma: {tarih}\nqwen2.5:72b | Jetson AGX Orin", kucuk_stil)
+        Paragraph(f"Oluşturulma: {tarih}\nModel: qwen2.5:14b (TR) · phi4 (EN)", kucuk_stil)
     ]], colWidths=["65%", "35%"])
     baslik_tablo.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), FIGES_KOYU),

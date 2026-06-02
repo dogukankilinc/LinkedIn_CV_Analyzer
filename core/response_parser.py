@@ -3,7 +3,7 @@ import json
 
 def parse_and_validate(raw_response: str) -> tuple[dict, list[str]]:
     """
-    qwen2.5:72b modelinden gelen yanıtı parse eder ve doğrular.
+    qwen2.5:14b / phi4 modelinden gelen yanıtı parse eder ve doğrular.
     extra_body={"format":"json"} ile saf JSON beklenir, yine de temizlik yapılır.
     """
     errors = []
