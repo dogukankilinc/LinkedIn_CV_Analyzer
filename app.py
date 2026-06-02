@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import os
+import time
 import threading
 from dotenv import load_dotenv
 from core.input_handler import get_combined_text
@@ -237,6 +238,7 @@ if analiz_btn:
         )
 
     try:
+        start_time = time.time()
         asama(10, "📖 Dosyalar okunuyor ve birleştiriliyor...")
         cv_text = get_combined_text(uploaded_file, manual_text)
 
@@ -247,6 +249,9 @@ if analiz_btn:
 
         asama(80, "🔍 Yanıt doğrulanıyor ve düzenleniyor...")
         result, errors = parse_and_validate(raw_response)
+        
+        end_time = time.time()
+        gecen_sure = end_time - start_time
 
         asama(100, "✅ Analiz tamamlandı!")
         ilerleme_bar.empty()
@@ -256,9 +261,9 @@ if analiz_btn:
             st.error(f"❌ {', '.join(errors)}")
             st.stop()
         if errors:
-            st.warning(f"⚠️ {', '.join(errors)}")
+            st.warning(f"⚠️ {', '.join(errors)}\n\n(Süre: {gecen_sure:.1f} saniye)")
         else:
-            st.success("✅ Analiz başarıyla tamamlandı!")
+            st.success(f"✅ Analiz başarıyla tamamlandı! (Süre: {gecen_sure:.1f} saniye)")
 
         # ─── MÜŞTERİ PROFİLİ ────────────────────────────────────
         kisiler  = result.get("kisisel_bilgiler", {})
@@ -370,6 +375,39 @@ if analiz_btn:
                 mime="application/json",
                 use_container_width=True
             )
+
+        # ─── E-POSTA İLE GÖNDERİM ─────────────────────────────────
+        st.markdown("### 📧 E-Posta ile Gönder")
+        with st.expander("PDF Raporunu Doğrudan E-Posta ile Gönder"):
+            st.info("💡 Not: Gönderim için `.env` dosyasında `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER` ve `SMTP_PASS` ayarları yapılmış olmalıdır.")
+            hedef_mail = st.text_input("Alıcı E-Posta Adresi:", placeholder="ornek@sirket.com")
+            if st.button("📤 E-Posta Gönder"):
+                if not hedef_mail:
+                    st.warning("Lütfen geçerli bir e-posta adresi girin.")
+                else:
+                    if 'pdf_bytes' not in locals():
+                        try:
+                            pdf_bytes = pdf_rapor_olustur(result)
+                        except Exception as pdf_err:
+                            st.error(f"PDF oluşturulamadı: {pdf_err}")
+                            st.stop()
+                            
+                    with st.spinner("E-posta gönderiliyor..."):
+                        from core.email_sender import send_pdf_email
+                        baslik = f"FIGES MathWorks Öneri Raporu - {ad_soyad}"
+                        mesaj = f"Merhaba,\n\n{ad_soyad} için oluşturulan MathWorks ürün öneri raporu ekte sunulmuştur.\n\nİyi çalışmalar,\nFIGES CV Analyzer"
+                        
+                        basari, msg = send_pdf_email(
+                            to_email=hedef_mail,
+                            subject=baslik,
+                            body=mesaj,
+                            pdf_bytes=pdf_bytes,
+                            pdf_filename=f"mathworks_{aday_dosya_adi}.pdf"
+                        )
+                        if basari:
+                            st.success(msg)
+                        else:
+                            st.error(msg)
 
     except Exception as e:
         ilerleme_bar.empty()
