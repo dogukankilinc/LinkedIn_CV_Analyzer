@@ -12,9 +12,24 @@ Bir müşteri adayının CV'sini (PDF veya metin olarak) yüklersiniz; sistem:
 - CV'deki **somut projelere ve becerilere** dayandırılmış MathWorks ürün önerileri üretir
 - Her öneri için **satış argümanı** hazırlar (görüşmeye girmeden önce okuyun)
 - Sonuçları **PDF raporu** ve **JSON** olarak dışa aktarır
-- Tüm çıktıyı **Türkçe** sunar
+- **CV diline göre otomatik model seçer** — Türkçe ve İngilizce için ayrı optimize edilmiş LLM
 
 > **Gizlilik:** Veriler hiçbir zaman dışarıya çıkmaz. Model ve uygulama tamamen yerel çalışır.
+
+---
+
+## 🌐 Çift Dil & Çift Model Desteği
+
+| | 🇹🇷 Türkçe CV | 🇬🇧 English CV |
+|---|---|---|
+| **Model** | `qwen2.5:14b` | `phi4` |
+| **Boyut** | ~9 GB | ~9 GB |
+| **Tahmini Süre** | ~15 sn | ~12 sn |
+| **Neden bu model?** | Qwen ailesi Türkçe'de açık ara en iyi | Microsoft Phi-4 JSON & instruction-following şampiyonu |
+| **Prompt dili** | Türkçe | English |
+| **Çıktı dili** | Türkçe | English |
+
+Uygulama açıldığında **🇹🇷 / 🇬🇧 butonlarından** biri seçilir. Tüm arayüz, prompt ve model otomatik değişir.
 
 ---
 
@@ -24,9 +39,10 @@ Bir müşteri adayının CV'sini (PDF veya metin olarak) yüklersiniz; sistem:
 |---|---|
 | 🔒 **Tam Gizlilik** | Yerel LLM (Ollama). Müşteri verisi dışarı çıkmaz. |
 | 🧠 **Halüsinasyon Engeli** | Sistem promptuna gömülü resmi MathWorks ürün kataloğu. Model yalnızca gerçek ürün adlarını önerebilir. |
+| 🌐 **Çift Dil Desteği** | Türkçe → `qwen2.5:14b` \| İngilizce → `phi4` |
 | 📄 **Format Desteği** | PDF yükleme, metin yapıştırma veya her ikisi. |
 | 💬 **Satış Argümanı** | Her öneri, satış ekibine hazır 2-3 cümlelik ikna metni içerir. |
-| 📊 **PDF Raporu** | Profesyonel A4 rapor (tespit, toolbox ve satış argümanı renkli kutularda). |
+| 📊 **PDF Raporu** | Profesyonel A4 rapor — tespit (turuncu), toolbox (mavi), satış argümanı (yeşil). |
 | 🖥️ **Çoklu Platform** | Windows (`baslat.bat`) ve Linux/Jetson AGX Orin (`baslat.sh`) desteği. |
 
 ---
@@ -36,7 +52,8 @@ Bir müşteri adayının CV'sini (PDF veya metin olarak) yüklersiniz; sistem:
 | Katman | Teknoloji |
 |---|---|
 | **Arayüz** | Streamlit |
-| **LLM** | Ollama — `qwen2.5:72b` |
+| **LLM (TR)** | Ollama — `qwen2.5:14b` |
+| **LLM (EN)** | Ollama — `phi4` |
 | **API** | OpenAI uyumlu endpoint (`http://127.0.0.1:11434/v1`) |
 | **PDF İşleme** | PyMuPDF + pdfplumber |
 | **Raporlama** | ReportLab |
@@ -50,9 +67,10 @@ Bir müşteri adayının CV'sini (PDF veya metin olarak) yüklersiniz; sistem:
 **Ön koşullar:**
 1. [Python 3.10+](https://www.python.org/downloads/) — kurulumda **"Add Python to PATH"** kutusunu **mutlaka işaretleyin**
 2. [Ollama](https://ollama.com/download) — indir ve kur
-3. CMD açıp modeli indir:
+3. CMD açıp modelleri indir:
    ```cmd
-   ollama pull qwen2.5:72b
+   ollama pull qwen2.5:14b
+   ollama pull phi4
    ```
 
 **Başlatma:**
@@ -79,10 +97,10 @@ chmod +x baslat.sh
 
 `baslat.sh` otomatik olarak:
 - Ollama'nın kurulu ve çalışır olduğunu kontrol eder
-- `qwen2.5:72b` modeli eksikse indirir
+- Eksik modelleri indirir
 - Python sanal ortamı (`.venv`) oluşturur
 - `requirements.txt` kütüphanelerini kurar
-- Uygulamayı `http://0.0.0.0:8501` adresinde başlatır (ağdan erişilebilir)
+- Uygulamayı `http://0.0.0.0:8501` adresinde başlatır
 
 Tarayıcıdan erişmek için:
 ```
@@ -95,7 +113,7 @@ http://<cihaz-ip-adresi>:8501
 
 ```
 cv_analyzer/
-├── app.py                  # Streamlit arayüzü
+├── app.py                  # Streamlit arayüzü (dil seçimi, analiz, sonuç kartları)
 ├── baslat.bat              # Windows başlatma scripti
 ├── baslat.sh               # Linux / Jetson AGX Orin başlatma scripti
 ├── requirements.txt        # Python bağımlılıkları
@@ -103,12 +121,12 @@ cv_analyzer/
 ├── .gitignore
 │
 ├── core/
-│   ├── llm_client.py       # OpenAI uyumlu Ollama istemcisi
-│   ├── prompt_builder.py   # MathWorks AE sistem promptu + ürün kataloğu
+│   ├── llm_client.py       # OpenAI SDK ile Ollama bağlantısı, dile göre model seçimi
+│   ├── prompt_builder.py   # TR/EN sistem promptları + MathWorks ürün kataloğu
 │   ├── response_parser.py  # JSON doğrulama ve alan garantisi
 │   ├── input_handler.py    # PDF + metin birleştirici
 │   ├── pdf_extractor.py    # PDF → metin dönüştürücü
-│   └── pdf_rapor.py        # Profesyonel PDF rapor üretici
+│   └── pdf_rapor.py        # ReportLab ile A4 PDF rapor üretici
 │
 └── ui/
     ├── components.py
@@ -117,7 +135,7 @@ cv_analyzer/
 
 ---
 
-## 📦 Çıktı Formatı (JSON Şeması)
+## 📦 Çıktı JSON Şeması
 
 ```json
 {
@@ -143,16 +161,20 @@ cv_analyzer/
 
 ## 🔧 Model veya Endpoint Değişikliği
 
-`core/llm_client.py` içindeki şu iki satırı güncelleyin:
+`core/llm_client.py` içindeki `MODELS` sözlüğünü güncelleyin:
 
 ```python
-MODEL_NAME = "qwen2.5:72b"   # farklı bir model kullanmak için değiştir
-BASE_URL   = "http://127.0.0.1:11434/v1"  # uzak sunucu için IP gir
+MODELS = {
+    "tr": "qwen2.5:14b",  # Türkçe CV için model
+    "en": "phi4",          # İngilizce CV için model
+}
+
+BASE_URL = "http://127.0.0.1:11434/v1"  # Uzak sunucu için IP değiştirin
 ```
 
 ---
 
 ## 👨‍💻 Geliştirici
 
-**Doğukan M. KILINÇ**
+**Doğukan Mehmet KILINÇ**
 *[linkedin.com/in/dgkilinc](https://www.linkedin.com/in/dgkilinc/)*
