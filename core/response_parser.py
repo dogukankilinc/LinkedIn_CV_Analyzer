@@ -12,7 +12,6 @@ def parse_and_validate(raw_response: str) -> tuple[dict, list[str]]:
     try:
         cleaned = raw_response.strip()
 
-        # Olası markdown sarmalayıcıları temizle
         if cleaned.startswith("```json"):
             cleaned = cleaned[7:]
         elif cleaned.startswith("```"):
@@ -21,7 +20,6 @@ def parse_and_validate(raw_response: str) -> tuple[dict, list[str]]:
             cleaned = cleaned[:-3]
         cleaned = cleaned.strip()
 
-        # JSON bloğunu bul (model bazen önüne metin ekleyebilir)
         if not cleaned.startswith("{"):
             start = cleaned.find("{")
             if start != -1:
@@ -45,34 +43,51 @@ def parse_and_validate(raw_response: str) -> tuple[dict, list[str]]:
     try:
         # kisisel_bilgiler
         if not isinstance(data.get("kisisel_bilgiler"), dict):
-            data["kisisel_bilgiler"] = {
-                "ad_soyad": None,
-                "sektor_veya_uzmanlik_alani": None
-            }
+            data["kisisel_bilgiler"] = {"ad_soyad": None, "sektor_veya_uzmanlik_alani": None}
 
-        # mevcut_muhendislik_yetkinlikleri — liste olmalı
+        # mevcut_muhendislik_yetkinlikleri
         if not isinstance(data.get("mevcut_muhendislik_yetkinlikleri"), list):
             data["mevcut_muhendislik_yetkinlikleri"] = []
 
-        # mathworks_urun_tavsiyeleri — liste olmalı, her eleman dict
+        # yetkinlik_puanlari — yeni alan
+        puanlar = data.get("yetkinlik_puanlari", {})
+        if not isinstance(puanlar, dict):
+            puanlar = {}
+
+        def _guvenceli_puan(key: str) -> int:
+            try:
+                val = int(puanlar.get(key, 0) or 0)
+                return max(0, min(100, val))   # 0-100 aralığında zorla
+            except (ValueError, TypeError):
+                return 0
+
+        data["yetkinlik_puanlari"] = {
+            "yapay_zeka_ve_veri":          _guvenceli_puan("yapay_zeka_ve_veri"),
+            "gomulu_sistemler":             _guvenceli_puan("gomulu_sistemler"),
+            "sistem_ve_kontrol_modelleme":  _guvenceli_puan("sistem_ve_kontrol_modelleme"),
+        }
+
+        # mathworks_urun_tavsiyeleri
         tavsiyeleri = data.get("mathworks_urun_tavsiyeleri", [])
         if not isinstance(tavsiyeleri, list):
             tavsiyeleri = []
 
-        temiz_tavsiyeleri = []
-        for i, tb in enumerate(tavsiyeleri):
+        temiz = []
+        for tb in tavsiyeleri:
             if not isinstance(tb, dict):
                 continue
-            # zorunlu alanlar garantisi
-            temiz = {
-                "tespit_edilen_ihtiyac":   tb.get("tespit_edilen_ihtiyac") or "",
-                "onerilen_ana_urun":       tb.get("onerilen_ana_urun") or "MATLAB",
-                "onerilen_toolboxlar":     tb.get("onerilen_toolboxlar") if isinstance(tb.get("onerilen_toolboxlar"), list) else [],
+            temiz.append({
+                "tespit_edilen_ihtiyac":      tb.get("tespit_edilen_ihtiyac") or "",
+                "kaynak_bolum":               tb.get("kaynak_bolum") or "Belirtilmemiş",
+                "onerilen_ana_urun":          tb.get("onerilen_ana_urun") or "MATLAB",
+                "onerilen_toolboxlar":        tb.get("onerilen_toolboxlar")
+                                              if isinstance(tb.get("onerilen_toolboxlar"), list) else [],
                 "satis_ve_kullanim_argumani": tb.get("satis_ve_kullanim_argumani") or "",
-            }
-            temiz_tavsiyeleri.append(temiz)
+                "satis_stratejisi_ipuclari":  tb.get("satis_stratejisi_ipuclari")
+                                              if isinstance(tb.get("satis_stratejisi_ipuclari"), list) else [],
+            })
 
-        data["mathworks_urun_tavsiyeleri"] = temiz_tavsiyeleri
+        data["mathworks_urun_tavsiyeleri"] = temiz
 
     except Exception as e:
         errors.append(f"Alan doğrulama hatası: {str(e)}")

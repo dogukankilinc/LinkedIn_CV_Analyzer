@@ -8,7 +8,15 @@ from reportlab.platypus import (
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import io
+import hashlib
 from datetime import datetime
+
+# ─── MD5 Patch for usedforsecurity error ────────────────────────
+original_md5 = hashlib.md5
+def patched_md5(*args, **kwargs):
+    kwargs.pop("usedforsecurity", None)
+    return original_md5(*args, **kwargs)
+hashlib.md5 = patched_md5
 
 # ─── Font Ayarları (Türkçe Karakter Desteği) ────────────────────
 try:
@@ -77,6 +85,16 @@ def pdf_rapor_olustur(analiz_sonucu: dict) -> bytes:
         fontName=FONT_NORMAL, leading=15, spaceAfter=4,
         backColor=YESIL_ACIK, leftIndent=6, borderPad=8)
 
+    kaynak_stil = ParagraphStyle("Kaynak", parent=styles["Normal"],
+        fontSize=9, textColor=colors.HexColor("#6c3483"),
+        fontName=FONT_ITALIC, leading=13, spaceAfter=4,
+        backColor=colors.HexColor("#f4ecf7"), leftIndent=6, borderPad=6)
+
+    ipucu_stil = ParagraphStyle("Ipucu", parent=styles["Normal"],
+        fontSize=9, textColor=colors.HexColor("#9c640c"),
+        fontName=FONT_NORMAL, leading=13, spaceAfter=4,
+        backColor=colors.HexColor("#fef9e7"), leftIndent=6, borderPad=6)
+
     toolbox_stil = ParagraphStyle("Toolbox", parent=styles["Normal"],
         fontSize=9.5, textColor=colors.HexColor("#1a365d"),
         fontName=FONT_BOLD, leading=14)
@@ -133,6 +151,35 @@ def pdf_rapor_olustur(analiz_sonucu: dict) -> bytes:
         hikaye.append(Paragraph(yetki_metni, normal_stil))
         hikaye.append(Spacer(1, 0.5*cm))
 
+    # ─── YETKİNLİK PUANLARI ────────────────────────────────────
+    puanlar = analiz_sonucu.get("yetkinlik_puanlari", {})
+    if puanlar:
+        hikaye.append(Paragraph("📊 Yetkinlik Puanları", bolum_stil))
+        hikaye.append(HRFlowable(width="100%", thickness=1.5, color=FIGES_MAVI, spaceAfter=6))
+
+        ai_puan  = puanlar.get("yapay_zeka_ve_veri", 0)
+        gs_puan  = puanlar.get("gomulu_sistemler", 0)
+        sk_puan  = puanlar.get("sistem_ve_kontrol_modelleme", 0)
+
+        puan_data = [
+            ["🤖 Yapay Zeka & Veri Bilimi", f"%{ai_puan}"],
+            ["🔧 Gömülü Sistemler", f"%{gs_puan}"],
+            ["⚙️ Sistem & Kontrol Modelleme", f"%{sk_puan}"]
+        ]
+        puan_tablo = Table(puan_data, colWidths=["75%", "25%"])
+        puan_tablo.setStyle(TableStyle([
+            ("FONTNAME",  (0, 0), (-1, -1), FONT_BOLD),
+            ("FONTSIZE",  (0, 0), (-1, -1), 10),
+            ("TEXTCOLOR", (0, 0), (0, -1), KARANLIK_YAZI),
+            ("TEXTCOLOR", (1, 0), (1, -1), FIGES_MAVI),
+            ("ALIGN",     (1, 0), (1, -1), "RIGHT"),
+            ("ROWBACKGROUNDS", (0, 0), (-1, -1), [GRI_ARKAPLAN, BEYAZ]),
+            ("PADDING",   (0, 0), (-1, -1), 8),
+            ("GRID",      (0, 0), (-1, -1), 0.3, colors.HexColor("#dce3ea")),
+        ]))
+        hikaye.append(puan_tablo)
+        hikaye.append(Spacer(1, 0.5*cm))
+
     # ─── MATHWORKS ÖNERİLERİ ────────────────────────────────────
     tavsiyeleri = analiz_sonucu.get("mathworks_urun_tavsiyeleri", [])
     hikaye.append(Paragraph(f"📦 Önerilen MathWorks Çözümleri  ({len(tavsiyeleri)} öneri)", bolum_stil))
@@ -142,7 +189,9 @@ def pdf_rapor_olustur(analiz_sonucu: dict) -> bytes:
         ana_urun   = tb.get("onerilen_ana_urun", "MATLAB")
         toolboxlar = tb.get("onerilen_toolboxlar", [])
         bulgu      = tb.get("tespit_edilen_ihtiyac", "")
+        kaynak     = tb.get("kaynak_bolum", "")
         arguman    = tb.get("satis_ve_kullanim_argumani", "")
+        ipuclari   = tb.get("satis_stratejisi_ipuclari", [])
 
         # Öneri başlığı
         hikaye.append(Paragraph(
@@ -154,6 +203,10 @@ def pdf_rapor_olustur(analiz_sonucu: dict) -> bytes:
 
         # Tespit edilen ihtiyaç (turuncu kutu)
         hikaye.append(Paragraph(f"🔍 Tespit Edilen İhtiyaç: {bulgu}", bulgu_stil))
+
+        # Kaynak Bölümü (mor kutu)
+        if kaynak:
+            hikaye.append(Paragraph(f"📂 CV'deki Kaynak: {kaynak}", kaynak_stil))
 
         # Önerilen Toolbox'lar (mavi tablo satırı)
         if toolboxlar:
@@ -168,8 +221,13 @@ def pdf_rapor_olustur(analiz_sonucu: dict) -> bytes:
             hikaye.append(toolbox_tablo)
             hikaye.append(Spacer(1, 0.15*cm))
 
-        # Satış argümanı (yeşil kutu — öne çıkarılan alan)
+        # Satış argümanı (yeşil kutu)
         hikaye.append(Paragraph(f"💬 Satış Argümanı: {arguman}", arguman_stil))
+
+        # İpuçları (sarı kutu)
+        for ip in ipuclari:
+            hikaye.append(Paragraph(f"💡 İpucu: {ip}", ipucu_stil))
+
         hikaye.append(HRFlowable(
             width="100%", thickness=0.4,
             color=colors.HexColor("#d5dde5"), spaceAfter=4
