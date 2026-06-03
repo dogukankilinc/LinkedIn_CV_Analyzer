@@ -2,15 +2,6 @@ import io
 import hashlib
 from datetime import datetime
 
-# ─── MD5 Patch for usedforsecurity error ────────────────────────
-# Reportlab'ı import etmeden ÖNCE hashlib'i yamalamalıyız,
-# yoksa reportlab orijinal md5'i önbelleğe alır.
-original_md5 = hashlib.md5
-def patched_md5(*args, **kwargs):
-    kwargs.pop("usedforsecurity", None)
-    return original_md5(*args, **kwargs)
-hashlib.md5 = patched_md5
-
 # ─── Reportlab Importları ───────────────────────────────────────
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors

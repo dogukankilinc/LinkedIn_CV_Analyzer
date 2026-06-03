@@ -1,3 +1,4 @@
+import core.md5_patch
 import streamlit as st
 import json
 from dotenv import load_dotenv

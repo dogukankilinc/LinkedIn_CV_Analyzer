@@ -1,3 +1,4 @@
+import core.md5_patch
 import streamlit as st
 import os
 import time

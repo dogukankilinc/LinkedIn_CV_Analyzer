@@ -1,3 +1,4 @@
+import core.md5_patch
 import streamlit as st
 from dotenv import load_dotenv
 from core.auth import require_login, is_admin, hash_password_public
