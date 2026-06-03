@@ -14,14 +14,35 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 # ─── Font Ayarları (Türkçe Karakter Desteği) ────────────────────
+import os
+import urllib.request
+
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+os.makedirs(FONT_DIR, exist_ok=True)
+
+FONTS = {
+    'Roboto-Regular': 'https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Regular.ttf',
+    'Roboto-Bold':    'https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Bold.ttf',
+    'Roboto-Italic':  'https://github.com/googlefonts/roboto/raw/main/src/hinted/Roboto-Italic.ttf'
+}
+
+for font_name, url in FONTS.items():
+    font_path = os.path.join(FONT_DIR, f"{font_name}.ttf")
+    if not os.path.exists(font_path):
+        try:
+            urllib.request.urlretrieve(url, font_path)
+        except Exception as e:
+            print(f"Font indirme hatası ({font_name}): {e}")
+
 try:
-    pdfmetrics.registerFont(TTFont('Arial', 'arial.ttf'))
-    pdfmetrics.registerFont(TTFont('Arial-Bold', 'arialbd.ttf'))
-    pdfmetrics.registerFont(TTFont('Arial-Italic', 'ariali.ttf'))
-    FONT_NORMAL = 'Arial'
-    FONT_BOLD   = 'Arial-Bold'
-    FONT_ITALIC = 'Arial-Italic'
+    pdfmetrics.registerFont(TTFont('Roboto', os.path.join(FONT_DIR, 'Roboto-Regular.ttf')))
+    pdfmetrics.registerFont(TTFont('Roboto-Bold', os.path.join(FONT_DIR, 'Roboto-Bold.ttf')))
+    pdfmetrics.registerFont(TTFont('Roboto-Italic', os.path.join(FONT_DIR, 'Roboto-Italic.ttf')))
+    FONT_NORMAL = 'Roboto'
+    FONT_BOLD   = 'Roboto-Bold'
+    FONT_ITALIC = 'Roboto-Italic'
 except Exception:
+    # Fallback (Türkçe desteklemez)
     FONT_NORMAL = 'Helvetica'
     FONT_BOLD   = 'Helvetica-Bold'
     FONT_ITALIC = 'Helvetica-Oblique'
