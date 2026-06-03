@@ -12,9 +12,9 @@ def send_pdf_email(
     pdf_filename: str,
 ) -> tuple[bool, str]:
     """
-    Belirtilen adrese PDF ekli e-posta gönderir.
-    Ortam değişkenleri app.py'deki load_dotenv() ile zaten yüklenmiş olur.
-    Gmail için Uygulama Şifresi (App Password) kullanılmalıdır.
+    PDF ekli e-posta gönderir.
+    to_email virgülle ayrılmış birden fazla adres olabilir.
+    Ortam değişkenleri app.py'deki load_dotenv() ile önceden yüklenmiş olmalı.
     """
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
     smtp_port   = int(os.environ.get("SMTP_PORT", "587"))
@@ -23,14 +23,18 @@ def send_pdf_email(
 
     if not smtp_user or not smtp_pass:
         return False, (
-            "❌ .env dosyasında SMTP_USER veya SMTP_PASS tanımlı değil. "
-            "Proje klasöründe .env dosyasının olduğundan emin olun."
+            "❌ .env dosyasında SMTP_USER veya SMTP_PASS eksik."
         )
+
+    # Birden fazla alıcı desteği
+    recipients = [addr.strip() for addr in to_email.split(",") if addr.strip()]
+    if not recipients:
+        return False, "❌ Geçerli e-posta adresi girilmedi."
 
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"]    = f"FIGES CV Analyzer <{smtp_user}>"
-    msg["To"]      = to_email
+    msg["To"]      = ", ".join(recipients)
     msg.set_content(body)
     msg.add_attachment(
         pdf_bytes,
@@ -47,18 +51,15 @@ def send_pdf_email(
             server.ehlo()
             server.login(smtp_user, smtp_pass)
             server.send_message(msg)
-        return True, f"✅ E-posta başarıyla gönderildi → {to_email}"
+        alici_str = ", ".join(recipients)
+        return True, f"✅ E-posta gönderildi → {alici_str}"
 
     except smtplib.SMTPAuthenticationError:
         return False, (
-            "❌ Gmail kimlik doğrulama hatası.\n\n"
-            "Normal hesap şifresi SMTP için çalışmaz. Çözüm:\n"
-            "1. Gmail → Ayarlar → Güvenlik → 2 Adımlı Doğrulama'yı açın\n"
-            "2. https://myaccount.google.com/apppasswords adresine gidin\n"
-            "3. 'Diğer' seçin → 'FIGES CV' yazın → Oluştur\n"
-            "4. Çıkan 16 haneli şifreyi .env dosyasındaki SMTP_PASS'e yazın"
+            "❌ Gmail kimlik doğrulama hatası.\n"
+            "Normal hesap şifresi çalışmaz — Gmail'den Uygulama Şifresi (App Password) oluşturun "
+            "ve .env dosyasındaki SMTP_PASS'e yapıştırın."
         )
-
     except Exception as e1:
         # Yöntem 2: Port 465 SSL
         try:
@@ -67,6 +68,7 @@ def send_pdf_email(
                                   timeout=15) as server:
                 server.login(smtp_user, smtp_pass)
                 server.send_message(msg)
-            return True, f"✅ E-posta başarıyla gönderildi → {to_email}"
+            alici_str = ", ".join(recipients)
+            return True, f"✅ E-posta gönderildi → {alici_str}"
         except Exception as e2:
             return False, f"❌ Gönderim hatası: {str(e2)}"
