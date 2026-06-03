@@ -1,13 +1,7 @@
 import smtplib
 import ssl
 import os
-from pathlib import Path
 from email.message import EmailMessage
-from dotenv import load_dotenv
-
-# .env her zaman proje kökünden yüklenir (core/ altından çağrılsa bile)
-_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(dotenv_path=_ENV_PATH, override=True)
 
 
 def send_pdf_email(
@@ -19,18 +13,18 @@ def send_pdf_email(
 ) -> tuple[bool, str]:
     """
     Belirtilen adrese PDF ekli e-posta gönderir.
-    Gmail için 'Uygulama Şifresi' (App Password) kullanılmalıdır.
-    Önce Port 587 (STARTTLS), başarısız olursa Port 465 (SSL) ile dener.
+    Ortam değişkenleri app.py'deki load_dotenv() ile zaten yüklenmiş olur.
+    Gmail için Uygulama Şifresi (App Password) kullanılmalıdır.
     """
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port   = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user   = os.getenv("SMTP_USER", "")
-    smtp_pass   = os.getenv("SMTP_PASS", "")
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port   = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_user   = os.environ.get("SMTP_USER", "")
+    smtp_pass   = os.environ.get("SMTP_PASS", "")
 
     if not smtp_user or not smtp_pass:
         return False, (
-            "❌ SMTP ayarları eksik. "
-            ".env dosyasında SMTP_USER ve SMTP_PASS tanımlı olmalıdır."
+            "❌ .env dosyasında SMTP_USER veya SMTP_PASS tanımlı değil. "
+            "Proje klasöründe .env dosyasının olduğundan emin olun."
         )
 
     msg = EmailMessage()
@@ -45,7 +39,7 @@ def send_pdf_email(
         filename=pdf_filename,
     )
 
-    # ─── Yöntem 1: Port 587 STARTTLS ──────────────────────────────
+    # Yöntem 1: Port 587 STARTTLS
     try:
         with smtplib.SMTP(smtp_server, 587, timeout=15) as server:
             server.ehlo()
@@ -54,20 +48,19 @@ def send_pdf_email(
             server.login(smtp_user, smtp_pass)
             server.send_message(msg)
         return True, f"✅ E-posta başarıyla gönderildi → {to_email}"
+
     except smtplib.SMTPAuthenticationError:
-        # Gmail'de normal şifre kabul edilmez; App Password gerekir
         return False, (
             "❌ Gmail kimlik doğrulama hatası.\n\n"
-            "Gmail, normal hesap şifresini SMTP için **kabul etmiyor**.\n"
-            "Çözüm:\n"
-            "1. Gmail hesabında **2 Adımlı Doğrulama** açık olmalı.\n"
-            "2. https://myaccount.google.com/apppasswords adresine gidin.\n"
-            "3. 'Uygulama Seç → Diğer (özel ad)' → 'FIGES CV Analyzer' yazın → Oluştur.\n"
-            "4. Oluşan **16 haneli şifreyi** .env dosyasındaki `SMTP_PASS` satırına yapıştırın.\n"
-            "5. Uygulamayı yeniden başlatın."
+            "Normal hesap şifresi SMTP için çalışmaz. Çözüm:\n"
+            "1. Gmail → Ayarlar → Güvenlik → 2 Adımlı Doğrulama'yı açın\n"
+            "2. https://myaccount.google.com/apppasswords adresine gidin\n"
+            "3. 'Diğer' seçin → 'FIGES CV' yazın → Oluştur\n"
+            "4. Çıkan 16 haneli şifreyi .env dosyasındaki SMTP_PASS'e yazın"
         )
-    except Exception as e:
-        # ─── Yöntem 2: Port 465 SSL ───────────────────────────────
+
+    except Exception as e1:
+        # Yöntem 2: Port 465 SSL
         try:
             with smtplib.SMTP_SSL(smtp_server, 465,
                                   context=ssl.create_default_context(),
@@ -76,4 +69,4 @@ def send_pdf_email(
                 server.send_message(msg)
             return True, f"✅ E-posta başarıyla gönderildi → {to_email}"
         except Exception as e2:
-            return False, f"❌ Gönderim hatası (587 & 465 denendi):\n{str(e2)}"
+            return False, f"❌ Gönderim hatası: {str(e2)}"

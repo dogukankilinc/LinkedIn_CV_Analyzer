@@ -166,10 +166,10 @@ if en_btn:
 
 language  = st.session_state.get("language", "tr")
 model_adi = get_model_name(language)
-_yukleniyor  = _tr_yukleniyor if language == "tr" else _en_yukleniyor
-_durum_ikon  = "⏳ Belleğe alınıyor..." if _yukleniyor else "✅ Belleğe alındı, hazır!"
-_durum_renk  = "#e67e22" if _yukleniyor else "#27ae60"
-lang_icon    = "🇹🇷 Türkçe" if language == "tr" else "🇬🇧 İngilizce"
+_yukleniyor = _tr_yukleniyor if language == "tr" else _en_yukleniyor
+_durum_ikon = "⏳ Belleğe alınıyor..." if _yukleniyor else "✅ Belleğe alındı, hazır!"
+_durum_renk = "#e67e22" if _yukleniyor else "#27ae60"
+lang_icon   = "🇹🇷 Türkçe" if language == "tr" else "🇬🇧 İngilizce"
 
 st.markdown(
     f'<div class="model-bilgi">'
@@ -240,22 +240,18 @@ if analiz_btn:
         start_time = time.time()
         asama(10, "📖 Dosyalar okunuyor ve birleştiriliyor...")
         cv_text = get_combined_text(uploaded_file, manual_text)
-
         asama(30, "📝 Analiz için metin hazırlanıyor...")
-
         asama(50, f"🤖 {model_adi} modeline gönderiliyor, lütfen bekleyin...")
         raw_response = analyze_cv_with_ollama(cv_text, language)
-
         asama(80, "🔍 Yanıt doğrulanıyor ve düzenleniyor...")
         result, errors = parse_and_validate(raw_response)
-        
-        end_time    = time.time()
-        gecen_sure  = end_time - start_time
+
+        gecen_sure = time.time() - start_time
         if gecen_sure < 60:
             sure_str = f"{gecen_sure:.0f} sn"
         else:
-            dk  = int(gecen_sure // 60)
-            sn  = int(gecen_sure % 60)
+            dk = int(gecen_sure // 60)
+            sn = int(gecen_sure % 60)
             sure_str = f"{dk} dk {sn:02d} sn"
 
         asama(100, "✅ Analiz tamamlandı!")
@@ -265,83 +261,103 @@ if analiz_btn:
         if errors and not result:
             st.error(f"❌ {', '.join(errors)}")
             st.stop()
-        if errors:
-            st.warning(f"⚠️ {', '.join(errors)}\n\n(Süre: {sure_str})")
-        else:
-            st.success(f"✅ Analiz başarıyla tamamlandı! ⏱️ {sure_str}")
 
-        # ─── MÜŞTERİ PROFİLİ ────────────────────────────────────
-        kisiler  = result.get("kisisel_bilgiler", {})
-        ad_soyad = kisiler.get("ad_soyad") or "Bilinmiyor"
-        sektor   = kisiler.get("sektor_veya_uzmanlik_alani") or "—"
+        # PDF üret
+        pdf_bytes = None
+        try:
+            pdf_bytes = pdf_rapor_olustur(result)
+        except Exception as pdf_err:
+            st.warning(f"⚠️ PDF oluşturulamadı: {pdf_err}")
 
-        st.markdown(f"## 👤 {ad_soyad}")
-        st.markdown(f"**Sektör / Uzmanlık Alanı:** `{sektor}`")
+        # Tüm sonuçları session_state'e kaydet
+        # (download_button tıklanınca sayfa render edilir, state olmadan kaybolur)
+        ad_soyad = (result.get("kisisel_bilgiler") or {}).get("ad_soyad") or "Bilinmiyor"
+        st.session_state["analiz_result"]   = result
+        st.session_state["analiz_pdf"]      = pdf_bytes
+        st.session_state["analiz_ad_soyad"] = ad_soyad
+        st.session_state["analiz_sure_str"] = sure_str
+        st.session_state["analiz_hatalar"]  = errors
+
+    except Exception as e:
+        ilerleme_bar.empty()
+        durum_metni.empty()
+        st.error(f"❌ {str(e)}")
+        st.info("💡 Ollama servisinin çalıştığını ve modellerin yüklü olduğunu kontrol edin.")
+
+# ─── Sonuçları Göster ────────────────────────────────────────────
+# session_state'den okunur → download_button sayfa yenilese de çalışır
+if "analiz_result" in st.session_state:
+    result    = st.session_state["analiz_result"]
+    pdf_bytes = st.session_state["analiz_pdf"]
+    ad_soyad  = st.session_state["analiz_ad_soyad"]
+    sure_str  = st.session_state["analiz_sure_str"]
+    errors    = st.session_state["analiz_hatalar"]
+
+    if errors:
+        st.warning(f"⚠️ {', '.join(errors)}\n\n(Süre: {sure_str})")
+    else:
+        st.success(f"✅ Analiz başarıyla tamamlandı! ⏱️ {sure_str}")
+
+    # ─── MÜŞTERİ PROFİLİ ────────────────────────────────────
+    kisiler = result.get("kisisel_bilgiler", {})
+    sektor  = kisiler.get("sektor_veya_uzmanlik_alani") or "—"
+    st.markdown(f"## 👤 {ad_soyad}")
+    st.markdown(f"**Sektör / Uzmanlık Alanı:** `{sektor}`")
+    st.divider()
+
+    # ─── YETKİNLİK PUANLARI ─────────────────────────────────
+    puanlar = result.get("yetkinlik_puanlari", {})
+    ai_puan = puanlar.get("yapay_zeka_ve_veri", 0)
+    gs_puan = puanlar.get("gomulu_sistemler", 0)
+    sk_puan = puanlar.get("sistem_ve_kontrol_modelleme", 0)
+
+    st.markdown("### 📊 Yetkinlik Puanları")
+    p1, p2, p3 = st.columns(3)
+    with p1:
+        st.markdown(
+            f'<div class="puan-kutu"><div class="puan-sayi">{ai_puan}</div>'
+            f'<div class="puan-etiket">🤖 Yapay Zeka & Veri Bilimi</div></div>',
+            unsafe_allow_html=True)
+        st.progress(ai_puan)
+    with p2:
+        st.markdown(
+            f'<div class="puan-kutu"><div class="puan-sayi">{gs_puan}</div>'
+            f'<div class="puan-etiket">🔧 Gömülü Sistemler</div></div>',
+            unsafe_allow_html=True)
+        st.progress(gs_puan)
+    with p3:
+        st.markdown(
+            f'<div class="puan-kutu"><div class="puan-sayi">{sk_puan}</div>'
+            f'<div class="puan-etiket">⚙️ Sistem & Kontrol Modelleme</div></div>',
+            unsafe_allow_html=True)
+        st.progress(sk_puan)
+
+    st.divider()
+
+    # ─── MÜHENDİSLİK YETKİNLİKLERİ ─────────────────────────
+    yetkinlikler = result.get("mevcut_muhendislik_yetkinlikleri", [])
+    if yetkinlikler:
+        st.markdown("### 🛠️ Müşteri Yetkinlikleri")
+        badges = " ".join([f'<span class="beceri-badge">{y}</span>' for y in yetkinlikler])
+        st.markdown(badges, unsafe_allow_html=True)
         st.divider()
 
-        # ─── YETKİNLİK PUANLARI ─────────────────────────────────
-        puanlar = result.get("yetkinlik_puanlari", {})
-        ai_puan  = puanlar.get("yapay_zeka_ve_veri", 0)
-        gs_puan  = puanlar.get("gomulu_sistemler", 0)
-        sk_puan  = puanlar.get("sistem_ve_kontrol_modelleme", 0)
+    # ─── MATHWORKS ÖNERİLERİ ────────────────────────────────
+    tavsiyeleri = result.get("mathworks_urun_tavsiyeleri", [])
+    st.markdown(f"### 📦 Önerilen MathWorks Çözümleri  `({len(tavsiyeleri)} öneri)`")
 
-        st.markdown("### 📊 Yetkinlik Puanları")
-        p1, p2, p3 = st.columns(3)
-        with p1:
-            st.markdown(
-                f'<div class="puan-kutu">'
-                f'<div class="puan-sayi">{ai_puan}</div>'
-                f'<div class="puan-etiket">🤖 Yapay Zeka & Veri Bilimi</div>'
-                f'</div>', unsafe_allow_html=True
-            )
-            st.progress(ai_puan)
-        with p2:
-            st.markdown(
-                f'<div class="puan-kutu">'
-                f'<div class="puan-sayi">{gs_puan}</div>'
-                f'<div class="puan-etiket">🔧 Gömülü Sistemler</div>'
-                f'</div>', unsafe_allow_html=True
-            )
-            st.progress(gs_puan)
-        with p3:
-            st.markdown(
-                f'<div class="puan-kutu">'
-                f'<div class="puan-sayi">{sk_puan}</div>'
-                f'<div class="puan-etiket">⚙️ Sistem & Kontrol Modelleme</div>'
-                f'</div>', unsafe_allow_html=True
-            )
-            st.progress(sk_puan)
+    for i, tb in enumerate(tavsiyeleri, 1):
+        ana_urun   = tb.get("onerilen_ana_urun", "MATLAB")
+        toolboxlar = tb.get("onerilen_toolboxlar", [])
+        bulgu      = tb.get("tespit_edilen_ihtiyac", "")
+        kaynak     = tb.get("kaynak_bolum", "")
+        arguman    = tb.get("satis_ve_kullanim_argumani", "")
+        ipuclari   = tb.get("satis_stratejisi_ipuclari", [])
 
-        st.divider()
+        toolbox_badges = " ".join([f'<span class="toolbox-badge">📦 {t}</span>' for t in toolboxlar])
+        ipucu_html     = "".join([f'<div class="ipucu-kutusu">💡 {ip}</div>' for ip in ipuclari])
 
-        # ─── MÜHENDİSLİK YETKİNLİKLERİ ─────────────────────────
-        yetkinlikler = result.get("mevcut_muhendislik_yetkinlikleri", [])
-        if yetkinlikler:
-            st.markdown("### 🛠️ Müşteri Yetkinlikleri")
-            badges = " ".join([f'<span class="beceri-badge">{y}</span>' for y in yetkinlikler])
-            st.markdown(badges, unsafe_allow_html=True)
-            st.divider()
-
-        # ─── MATHWORKS ÖNERİLERİ ────────────────────────────────
-        tavsiyeleri = result.get("mathworks_urun_tavsiyeleri", [])
-        st.markdown(f"### 📦 Önerilen MathWorks Çözümleri  `({len(tavsiyeleri)} öneri)`")
-
-        for i, tb in enumerate(tavsiyeleri, 1):
-            ana_urun  = tb.get("onerilen_ana_urun", "MATLAB")
-            toolboxlar = tb.get("onerilen_toolboxlar", [])
-            bulgu     = tb.get("tespit_edilen_ihtiyac", "")
-            kaynak    = tb.get("kaynak_bolum", "")
-            arguman   = tb.get("satis_ve_kullanim_argumani", "")
-            ipuclari  = tb.get("satis_stratejisi_ipuclari", [])
-
-            toolbox_badges = " ".join(
-                [f'<span class="toolbox-badge">📦 {t}</span>' for t in toolboxlar]
-            )
-            ipucu_html = "".join(
-                [f'<div class="ipucu-kutusu">💡 {ip}</div>' for ip in ipuclari]
-            )
-
-            st.markdown(f"""
+        st.markdown(f"""
 <div class="tavsiye-kart">
     <h4>#{i} — <span class="ana-urun-etiket">{ana_urun}</span></h4>
     <div class="bulgu-kutusu">🔍 <b>Tespit Edilen İhtiyaç:</b> {bulgu}</div>
@@ -352,63 +368,56 @@ if analiz_btn:
 </div>
 """, unsafe_allow_html=True)
 
-        # ─── RAPOR DIŞA AKTARMA ──────────────────────────────────
-        st.divider()
-        st.markdown("### 📤 Raporu Dışa Aktar")
-        aday_dosya_adi = ad_soyad.replace(" ", "_")
+    # ─── PDF İNDİR ───────────────────────────────────────────
+    st.divider()
+    st.markdown("### 📤 Raporu İndir")
+    aday_dosya_adi = ad_soyad.replace(" ", "_")
 
-        # PDF spinner dışında üretiliyor — bytes nesnesinin scope'ta kalması için
-        pdf_bytes = None
-        try:
-            pdf_bytes = pdf_rapor_olustur(result)
-        except Exception as pdf_err:
-            st.error(f"PDF oluşturma hatası: {pdf_err}")
+    if pdf_bytes:
+        st.download_button(
+            label="📄 PDF Raporu İndir",
+            data=pdf_bytes,
+            file_name=f"mathworks_{aday_dosya_adi}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            type="primary",
+        )
+    else:
+        st.error("PDF oluşturulamadı.")
 
-        if pdf_bytes:
-            st.download_button(
-                label="📄 PDF Raporu İndir",
-                data=pdf_bytes,
-                file_name=f"mathworks_{aday_dosya_adi}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-                type="primary",
-            )
-
-        # ─── E-POSTA İLE GÖNDERİM ─────────────────────────────────
-        st.markdown("### 📧 E-Posta ile Gönder")
-        with st.expander("PDF Raporunu Doğrudan E-Posta ile Gönder"):
-            hedef_mail = st.text_input("Alıcı E-Posta Adresi:", placeholder="ornek@sirket.com", key="mail_input")
-            if st.button("📤 E-Posta Gönder", key="mail_gonder_btn"):
-                if not hedef_mail.strip():
-                    st.warning("Lütfen geçerli bir e-posta adresi girin.")
-                elif pdf_bytes is None:
-                    st.error("PDF oluşturulamadı, e-posta gönderilemez.")
-                else:
-                    with st.spinner("E-posta gönderiliyor..."):
-                        from core.email_sender import send_pdf_email
-                        baslik = f"FIGES MathWorks Öneri Raporu — {ad_soyad}"
-                        mesaj  = (
-                            f"Merhaba,\n\n"
-                            f"{ad_soyad} için hazırlanan MathWorks ürün öneri raporu ekte sunulmuştur.\n\n"
-                            f"İyi çalışmalar,\nFIGES CV Analyzer"
-                        )
-                        basari, msg = send_pdf_email(
-                            to_email=hedef_mail.strip(),
-                            subject=baslik,
-                            body=mesaj,
-                            pdf_bytes=pdf_bytes,
-                            pdf_filename=f"mathworks_{aday_dosya_adi}.pdf",
-                        )
-                        if basari:
-                            st.success(msg)
-                        else:
-                            st.error(msg)
-
-    except Exception as e:
-        ilerleme_bar.empty()
-        durum_metni.empty()
-        st.error(f"❌ {str(e)}")
-        st.info("💡 Ollama servisinin çalıştığını ve modellerin yüklü olduğunu kontrol edin.")
+    # ─── E-POSTA İLE GÖNDERİM ─────────────────────────────────
+    st.markdown("### 📧 E-Posta ile Gönder")
+    with st.expander("PDF Raporunu Doğrudan E-Posta ile Gönder"):
+        hedef_mail = st.text_input(
+            "Alıcı E-Posta Adresi:",
+            placeholder="ornek@sirket.com",
+            key="mail_input"
+        )
+        if st.button("📤 E-Posta Gönder", key="mail_gonder_btn"):
+            if not hedef_mail.strip():
+                st.warning("Lütfen geçerli bir e-posta adresi girin.")
+            elif not pdf_bytes:
+                st.error("PDF mevcut değil, e-posta gönderilemez.")
+            else:
+                with st.spinner("E-posta gönderiliyor..."):
+                    from core.email_sender import send_pdf_email
+                    baslik = f"FIGES MathWorks Öneri Raporu — {ad_soyad}"
+                    mesaj  = (
+                        f"Merhaba,\n\n"
+                        f"{ad_soyad} için hazırlanan MathWorks ürün öneri raporu "
+                        f"ekte sunulmuştur.\n\nİyi çalışmalar,\nFIGES CV Analyzer"
+                    )
+                    basari, msg = send_pdf_email(
+                        to_email=hedef_mail.strip(),
+                        subject=baslik,
+                        body=mesaj,
+                        pdf_bytes=pdf_bytes,
+                        pdf_filename=f"mathworks_{aday_dosya_adi}.pdf",
+                    )
+                    if basari:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
 
 # ─── Footer ──────────────────────────────────────────────────────
 st.markdown("""
