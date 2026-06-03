@@ -1,20 +1,38 @@
-# 🔬 FIGES MathWorks CV Analyzer
+# 🔬 FIGES MathWorks CV Analyzer — v2.0
 
-> Mühendis ve akademisyen CV'lerini analiz ederek en uygun **MATLAB, Simulink ve MathWorks Toolbox**'larını öneren, **tamamen yerel ve bulut bağımsız** yapay zeka satış asistanı.
+> Mühendis ve akademisyenlerin **LinkedIn profillerinden** indirilen CV'lerini analiz ederek en uygun **MATLAB, Simulink ve MathWorks Toolbox**'larını öneren, **tamamen yerel ve çok kullanıcılı** yapay zeka satış asistanı.
 
 ---
 
-## 📌 Ne İş Yapar?
+## 📌 Kullanım Senaryosu ve İş Akışı
 
-Bir müşteri adayının CV'sini (PDF veya metin olarak) yüklersiniz; sistem:
+Satış mühendisleri müşteri toplantılarından veya aramalarından önce şu adımları izler:
 
-- Adayın **mühendislik yetkinliklerini** tespit eder
-- CV'deki **somut projelere ve becerilere** dayandırılmış MathWorks ürün önerileri üretir
-- Her öneri için **satış mühendisine hazır satış argümanı** oluşturur
-- Sonuçları **PDF raporu** ve **JSON** olarak dışa aktarır
-- **CV diline göre otomatik model seçer** — Türkçe ve İngilizce için ayrı optimize edilmiş LLM kullanır
+1. **LinkedIn'den Çıktı Alma:** Adayın LinkedIn profiline girilir, `Daha Fazla` ➔ `PDF olarak kaydet` (Save to PDF) seçeneğiyle profil PDF olarak indirilir.
+2. **Sisteme Yükleme:** İndirilen PDF dosyası **FIGES CV Analyzer** arayüzüne sürüklenip bırakılır. (İstenirse profil metni kopyala-yapıştır ile de eklenebilir).
+3. **Analiz Süreci:** Sistem saniyeler içinde adayın yetkinliklerini tespit eder ve MathWorks ürün ailesine özel satış argümanları üretir.
+4. **Toplu Tarama ve E-Posta:** Analiz sonucu hem profesyonel bir **PDF raporu** olarak indirilebilir hem de arayüzden çıkmadan doğrudan istenen e-posta adresine (veya adreslerine) PDF ekli olarak gönderilebilir. 
 
-> **Gizlilik:** Veriler hiçbir zaman dışarıya çıkmaz. Model ve uygulama tamamen yerel çalışır.
+*Bu çıktılar, müşteri ile toplantı almayı veya toplantı esnasında adayın ilgisini çekecek en doğru ürünü sunmayı hedefler.*
+
+> **Gizlilik:** Veriler hiçbir zaman dışarıya çıkmaz. Model ve uygulama tamamen yerel (NVIDIA Jetson AGX Orin / Windows) çalışır.
+
+---
+
+## 🚀 v2.0 Yeni Özellikler (Çoklu Sayfa Mimarisi)
+
+Bu sürüm ile birlikte uygulama tamamen kurumsal bir araca dönüştürülmüştür:
+
+| Yeni Özellik | Detay |
+|---|---|
+| 🔐 **Çok Kullanıcılı Sistem** | Her satış mühendisi kendi "kullanıcı adı" ve "şifresi" ile kayıt olup giriş yapar. Oturumlar izole edilir. |
+| 🗄️ **SQLite Veritabanı** | Analiz sonuçları artık kaybolmaz. RAM yerine yerel bir `figes_cv.db` dosyasında kalıcı olarak saklanır. |
+| 📋 **Tarama Geçmişi** | **Geçmiş** sayfası üzerinden kullanıcının son 10 analizi listelenir. Eski adaylara ait PDF'ler tekrar indirilebilir veya e-posta atılabilir. |
+| 👑 **Admin Paneli** | Geliştirici (`dogukan` / `admin123`) özel **Admin** sayfasından tüm kullanıcıları, kaç analiz yaptıklarını, kayıt tarihlerini ve sistemdeki tüm analiz özetlerini görebilir. Kullanıcı şifrelerini sıfırlayabilir veya hesapları silebilir. |
+| 🎯 **A/B/C/D Skorlaması** | Yapay zekanın verdiği teknik puanların ortalamasına göre müşteri otomatik olarak potansiyel sınıfına ayrılır (*A: Yüksek, B: Orta, C: Düşük, D: Potansiyel Yok*). |
+| 🔁 **Tekrarlı Analiz Uyarısı** | Aynı adayın CV'si daha önce yüklendiyse sistem bunu otomatik fark eder ve kullanıcıyı uyarır. |
+| 📧 **Gelişmiş E-Posta** | SMTP üzerinden doğrudan rapor gönderimi. Virgülle ayrılarak birden fazla adrese gönderim yapılabilir. |
+| 🇹🇷 **Mükemmel Türkçe PDF** | PDF oluşturulurken Google'ın orijinal `Roboto` fontları otomatik indirilip gömülür. (İ, Ş, Ğ gibi karakterlerin Linux/Jetson üzerinde bozulması engellenir). |
 
 ---
 
@@ -29,109 +47,61 @@ Bir müşteri adayının CV'sini (PDF veya metin olarak) yüklersiniz; sistem:
 | **Prompt dili** | Türkçe | English |
 | **Çıktı dili** | Türkçe | English |
 
-Uygulama açıldığında **🇹🇷 / 🇬🇧 butonlarından** biri seçilir. Tüm arayüz, prompt ve model otomatik değişir.
-
----
-
-## ⚙️ Özellikler
-
-| Özellik | Detay |
-|---|---|
-| 🔒 **Tam Gizlilik** | Yerel LLM (Ollama). Müşteri verisi dışarı çıkmaz. |
-| 🧠 **Halüsinasyon Engeli** | Sistem promptuna gömülü resmi MathWorks ürün kataloğu. Model yalnızca gerçek ürün adlarını önerebilir. |
-| 🌐 **Çift Dil Desteği** | Türkçe → `qwen2.5:14b` · İngilizce → `phi4` |
-| ⚡ **Model Warm-Up** | Başlatma anında modeller arka planda RAM'e alınır. İlk analizde sıfır bekleme süresi. `keep_alive: 4h` ile RAM'de tutulur. |
-| 📄 **Format Desteği** | PDF yükleme, metin yapıştırma veya her ikisi. |
-| 💬 **Satış Argümanı** | Her öneri, satış ekibine hazır 2-3 cümlelik ikna metni içerir. |
-| 📊 **PDF Raporu** | Profesyonel A4 rapor — tespit (turuncu), toolbox (mavi), satış argümanı (yeşil). |
-| 🖥️ **Çoklu Platform** | Windows (`baslat.bat`) ve Linux/Jetson AGX Orin (`baslat.sh`) desteği. |
-
 ---
 
 ## 🛠️ Teknoloji Yığını
 
 | Katman | Teknoloji |
 |---|---|
-| **Arayüz** | Streamlit |
-| **LLM (TR)** | Ollama — `qwen2.5:14b` |
-| **LLM (EN)** | Ollama — `phi4` |
-| **API** | OpenAI uyumlu endpoint (`http://127.0.0.1:11434/v1`) |
-| **Warm-Up** | Ollama `/api/generate` + `keep_alive: 4h` |
-| **PDF İşleme** | PyMuPDF + pdfplumber |
-| **Raporlama** | ReportLab |
+| **Arayüz** | Streamlit (Multipage / Çoklu Sayfa) |
+| **Veritabanı** | SQLite3 (`data/figes_cv.db`) |
+| **LLM** | Ollama (`qwen2.5:14b` ve `phi4`) |
+| **Bağlantı** | OpenAI SDK uyumlu endpoint (`http://127.0.0.1:11434/v1`) |
+| **Şifreleme** | PBKDF2 (SHA-256) Hashing |
+| **PDF İşleme** | PyMuPDF + pdfplumber + ReportLab + Roboto Fonts |
 
 ---
 
 ## 🚀 Kurulum ve Çalıştırma
 
-### Windows
+### 1. Ön Koşullar (NVIDIA Jetson AGX Orin veya Linux)
+- [Ollama](https://ollama.com/download) kurulu ve çalışır durumda olmalı.
+- Python 3.10+ yüklü olmalı.
+- E-posta atabilmek için Google Hesabı **Uygulama Şifresi** (App Password) alınmış olmalı.
 
-**Ön koşullar:**
-1. [Python 3.10+](https://www.python.org/downloads/) — kurulumda **"Add Python to PATH"** kutusunu **mutlaka işaretleyin**
-2. [Ollama](https://ollama.com/download) — indir ve kur
-3. CMD açıp modelleri indir (~9 GB her biri):
-   ```cmd
-   ollama pull qwen2.5:14b
-   ollama pull phi4
-   ```
-
-**Başlatma:**
-```
-cv_analyzer klasörüne gir → baslat.bat dosyasına çift tıkla
-```
-Script; sanal ortamı kurar, kütüphaneleri yükler, modelleri arka planda RAM'e alır ve uygulamayı açar.
-
----
-
-### Linux / NVIDIA Jetson AGX Orin
-
-**Projeyi klonla:**
+### 2. Projeyi Klonla ve Ayarları Yap
 ```bash
 git clone https://github.com/dogukankilinc/LinkedIn_CV_Analyzer.git
 cd LinkedIn_CV_Analyzer
+
+# E-posta gönderebilmek için yapılandırma dosyasını (.env) oluşturun:
+cat << 'EOF' > .env
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=senin_mail_adresin@gmail.com
+SMTP_PASS=senin_uygulama_sifren
+EOF
 ```
 
-**Tek komutla başlat:**
+### 3. Tek Komutla Başlat
 ```bash
 chmod +x baslat.sh
 ./baslat.sh
 ```
 
 `baslat.sh` otomatik olarak:
-1. Ollama'nın kurulu ve çalışır olduğunu kontrol eder
-2. `qwen2.5:14b` ve `phi4` modelleri eksikse indirir
-3. Python sanal ortamı (`.venv`) oluşturur ve `requirements.txt` bağımlılıklarını kurar
-4. Her iki modeli arka planda RAM'e alır (`keep_alive: 4h` ile warm-up)
-5. Uygulamayı `http://0.0.0.0:8501` adresinde başlatır (ağdan erişilebilir)
+1. Ollama'nın çalışıp çalışmadığını kontrol eder.
+2. `qwen2.5:14b` ve `phi4` modelleri eksikse indirir.
+3. Python sanal ortamı (`.venv`) oluşturur ve kütüphaneleri kurar.
+4. Her iki modeli arka planda RAM'e alır (`keep_alive: 4h` ile).
+5. Uygulamayı `http://0.0.0.0:8501` adresinde başlatır.
 
-Tarayıcıdan erişmek için:
+Tarayıcınızdan şu adrese giderek uygulamaya erişebilirsiniz:
 ```
 http://<cihaz-ip-adresi>:8501
 ```
 
----
-
-## ⚡ Model Warm-Up Nasıl Çalışır?
-
-USB SSD'den modelin RAM'e ilk kopyalanma süresi (Time to First Token) 15-20 saniye olabiliyor. Bu gecikmeyi sıfıra indirmek için iki katmanlı warm-up uygulanmıştır:
-
-```
-baslat.sh / baslat.bat başlatılır
-    │
-    ├── curl / PowerShell → Ollama'ya boş istek → Model USB SSD'den RAM'e yüklenmeye başlar
-    │   (arka planda, Streamlit başlamasını engellemez)
-    │
-    └── Streamlit başlar → Kullanıcı UI'ı görür
-            │
-            └── @st.cache_resource + threading → warmup_model() arka planda çalışır
-                (ikinci güvenlik katmanı)
-```
-
-**Durum göstergesi** arayüzde anlık güncellenir:
-- `⏳ Belleğe alınıyor...` → turuncu (yükleniyor)
-- `✅ Belleğe alındı, hazır!` → yeşil (anında analiz yapılabilir)
-
-**`keep_alive: 4h`** — Her analizden sonra sayaç sıfırlanır. Aktif kullanımda model süresiz RAM'de kalır. 4 saat hareketsizlik sonrası bellekten atılır.
+> **Giriş Bilgileri:** Uygulama ilk açıldığında `dogukan` (Şifre: `admin123`) isimli kurucu/admin hesabı otomatik olarak oluşturulur. Diğer kullanıcılar "Hesap Oluştur" sekmesinden kendileri kayıt olabilirler.
 
 ---
 
@@ -139,74 +109,31 @@ baslat.sh / baslat.bat başlatılır
 
 ```
 cv_analyzer/
-├── app.py                  # Streamlit arayüzü (dil seçimi, warm-up durumu, analiz, sonuç kartları)
-├── baslat.bat              # Windows başlatma scripti (warm-up dahil)
-├── baslat.sh               # Linux / Jetson AGX Orin başlatma scripti (warm-up dahil)
-├── requirements.txt        # Python bağımlılıkları
-├── .env                    # Ortam değişkenleri (git'e dahil edilmez)
-├── README.md
-├── .gitignore
+├── app.py                  # Streamlit Giriş/Kayıt arayüzü (Entrypoint)
+├── pages/
+│   ├── 1_Analiz.py         # Ana analiz ekranı, PDF/E-posta işlemleri
+│   ├── 2_Gecmis.py         # Kullanıcı geçmişi (Son 10 analiz)
+│   └── 3_Admin.py          # Admin yönetim paneli (Kullanıcı sil/şifre sıfırla)
 │
 ├── core/
-│   ├── llm_client.py       # OpenAI SDK ile Ollama bağlantısı, dile göre model seçimi, warm-up fonksiyonları
-│   ├── prompt_builder.py   # TR/EN sistem promptları + resmi MathWorks ürün kataloğu
-│   ├── response_parser.py  # JSON doğrulama ve alan garantisi
-│   ├── input_handler.py    # PDF + metin birleştirici
-│   ├── pdf_extractor.py    # PDF → metin dönüştürücü
-│   └── pdf_rapor.py        # ReportLab ile A4 PDF rapor üretici
+│   ├── auth.py             # Kimlik doğrulama, hashleme
+│   ├── db.py               # SQLite veritabanı CRUD işlemleri
+│   ├── llm_client.py       # Ollama API bağlantısı ve Warm-up
+│   ├── email_sender.py     # Çoklu alıcı destekli SMTP e-posta gönderici
+│   ├── md5_patch.py        # ReportLab MD5 FIPS yaması
+│   ├── pdf_rapor.py        # Dinamik TTF font destekli A4 PDF oluşturucu
+│   ├── prompt_builder.py   # MathWorks ürün kataloğu içeren asıl prompt
+│   ├── response_parser.py  # JSON ayrıştırma ve doğrulama
+│   ├── input_handler.py    # PDF ve metin birleştirme (PyMuPDF)
+│   └── ui_helpers.py       # Ortak CSS, A/B/C/D skorlaması ve UI bileşenleri
 │
-└── ui/
-    ├── components.py
-    └── charts.py
-```
-
----
-
-## 📦 Çıktı JSON Şeması
-
-```json
-{
-  "kisisel_bilgiler": {
-    "ad_soyad": "...",
-    "sektor_veya_uzmanlik_alani": "Otomotiv / Savunma / Akademik..."
-  },
-  "mevcut_muhendislik_yetkinlikleri": [
-    "Gömülü Sistemler", "Görüntü İşleme", "..."
-  ],
-  "mathworks_urun_tavsiyeleri": [
-    {
-      "tespit_edilen_ihtiyac": "CV'deki somut proje veya beceriye dayalı açıklama",
-      "onerilen_ana_urun": "MATLAB veya Simulink",
-      "onerilen_toolboxlar": ["Computer Vision Toolbox", "Embedded Coder"],
-      "satis_ve_kullanim_argumani": "2-3 cümlelik teknik satış argümanı"
-    }
-  ]
-}
-```
-
----
-
-## 🔧 Yapılandırma
-
-### Model Değiştirme
-`core/llm_client.py` içindeki `MODELS` sözlüğünü güncelleyin:
-
-```python
-MODELS = {
-    "tr": "qwen2.5:14b",  # Türkçe CV için model
-    "en": "phi4",          # İngilizce CV için model
-}
-```
-
-### Endpoint Değiştirme
-```python
-BASE_URL = "http://127.0.0.1:11434/v1"  # Uzak sunucu için IP değiştirin
-```
-
-### Warm-Up Süresi
-```python
-KEEP_ALIVE = "4h"   # 4 saatlik hareketsizlikten sonra RAM'den at
-# KEEP_ALIVE = "-1" # Asla RAM'den atma (sürekli işgal eder)
+├── data/
+│   └── figes_cv.db         # (Otomatik oluşur) Veritabanı dosyası
+├── fonts/                  
+│   └── Roboto-*.ttf        # (Otomatik iner) Türkçe karakter fontları
+│
+├── baslat.bat              # Windows başlatma scripti
+└── baslat.sh               # Jetson/Linux başlatma scripti
 ```
 
 ---
