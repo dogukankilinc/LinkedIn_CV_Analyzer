@@ -250,8 +250,14 @@ if analiz_btn:
         asama(80, "🔍 Yanıt doğrulanıyor ve düzenleniyor...")
         result, errors = parse_and_validate(raw_response)
         
-        end_time = time.time()
-        gecen_sure = end_time - start_time
+        end_time    = time.time()
+        gecen_sure  = end_time - start_time
+        if gecen_sure < 60:
+            sure_str = f"{gecen_sure:.0f} sn"
+        else:
+            dk  = int(gecen_sure // 60)
+            sn  = int(gecen_sure % 60)
+            sure_str = f"{dk} dk {sn:02d} sn"
 
         asama(100, "✅ Analiz tamamlandı!")
         ilerleme_bar.empty()
@@ -261,9 +267,9 @@ if analiz_btn:
             st.error(f"❌ {', '.join(errors)}")
             st.stop()
         if errors:
-            st.warning(f"⚠️ {', '.join(errors)}\n\n(Süre: {gecen_sure:.1f} saniye)")
+            st.warning(f"⚠️ {', '.join(errors)}\n\n(Süre: {sure_str})")
         else:
-            st.success(f"✅ Analiz başarıyla tamamlandı! (Süre: {gecen_sure:.1f} saniye)")
+            st.success(f"✅ Analiz başarıyla tamamlandı! ⏱️ {sure_str}")
 
         # ─── MÜŞTERİ PROFİLİ ────────────────────────────────────
         kisiler  = result.get("kisisel_bilgiler", {})
