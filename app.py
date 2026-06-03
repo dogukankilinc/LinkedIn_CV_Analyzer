@@ -1,5 +1,4 @@
 import streamlit as st
-import json
 import os
 import time
 import threading
@@ -358,57 +357,47 @@ if analiz_btn:
         st.markdown("### 📤 Raporu Dışa Aktar")
         aday_dosya_adi = ad_soyad.replace(" ", "_")
 
-        exp_col1, exp_col2 = st.columns(2)
-        with exp_col1:
-            with st.spinner("PDF hazırlanıyor..."):
-                try:
-                    pdf_bytes = pdf_rapor_olustur(result)
-                    st.download_button(
-                        label="📄 PDF Olarak İndir",
-                        data=pdf_bytes,
-                        file_name=f"mathworks_{aday_dosya_adi}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-                except Exception as pdf_err:
-                    st.error(f"PDF hatası: {pdf_err}")
+        # PDF spinner dışında üretiliyor — bytes nesnesinin scope'ta kalması için
+        pdf_bytes = None
+        try:
+            pdf_bytes = pdf_rapor_olustur(result)
+        except Exception as pdf_err:
+            st.error(f"PDF oluşturma hatası: {pdf_err}")
 
-        with exp_col2:
+        if pdf_bytes:
             st.download_button(
-                label="🗂️ JSON Olarak İndir",
-                data=json.dumps(result, ensure_ascii=False, indent=2),
-                file_name=f"mathworks_{aday_dosya_adi}.json",
-                mime="application/json",
-                use_container_width=True
+                label="📄 PDF Raporu İndir",
+                data=pdf_bytes,
+                file_name=f"mathworks_{aday_dosya_adi}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                type="primary",
             )
 
         # ─── E-POSTA İLE GÖNDERİM ─────────────────────────────────
         st.markdown("### 📧 E-Posta ile Gönder")
         with st.expander("PDF Raporunu Doğrudan E-Posta ile Gönder"):
-            st.info("💡 Not: Gönderim için `.env` dosyasında `SMTP_SERVER`, `SMTP_PORT`, `SMTP_USER` ve `SMTP_PASS` ayarları yapılmış olmalıdır.")
-            hedef_mail = st.text_input("Alıcı E-Posta Adresi:", placeholder="ornek@sirket.com")
-            if st.button("📤 E-Posta Gönder"):
-                if not hedef_mail:
+            hedef_mail = st.text_input("Alıcı E-Posta Adresi:", placeholder="ornek@sirket.com", key="mail_input")
+            if st.button("📤 E-Posta Gönder", key="mail_gonder_btn"):
+                if not hedef_mail.strip():
                     st.warning("Lütfen geçerli bir e-posta adresi girin.")
+                elif pdf_bytes is None:
+                    st.error("PDF oluşturulamadı, e-posta gönderilemez.")
                 else:
-                    if 'pdf_bytes' not in locals():
-                        try:
-                            pdf_bytes = pdf_rapor_olustur(result)
-                        except Exception as pdf_err:
-                            st.error(f"PDF oluşturulamadı: {pdf_err}")
-                            st.stop()
-                            
                     with st.spinner("E-posta gönderiliyor..."):
                         from core.email_sender import send_pdf_email
-                        baslik = f"FIGES MathWorks Öneri Raporu - {ad_soyad}"
-                        mesaj = f"Merhaba,\n\n{ad_soyad} için oluşturulan MathWorks ürün öneri raporu ekte sunulmuştur.\n\nİyi çalışmalar,\nFIGES CV Analyzer"
-                        
+                        baslik = f"FIGES MathWorks Öneri Raporu — {ad_soyad}"
+                        mesaj  = (
+                            f"Merhaba,\n\n"
+                            f"{ad_soyad} için hazırlanan MathWorks ürün öneri raporu ekte sunulmuştur.\n\n"
+                            f"İyi çalışmalar,\nFIGES CV Analyzer"
+                        )
                         basari, msg = send_pdf_email(
-                            to_email=hedef_mail,
+                            to_email=hedef_mail.strip(),
                             subject=baslik,
                             body=mesaj,
                             pdf_bytes=pdf_bytes,
-                            pdf_filename=f"mathworks_{aday_dosya_adi}.pdf"
+                            pdf_filename=f"mathworks_{aday_dosya_adi}.pdf",
                         )
                         if basari:
                             st.success(msg)
